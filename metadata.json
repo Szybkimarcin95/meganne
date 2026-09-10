@@ -1,0 +1,6 @@
+{
+  "name": "Megane Overlord",
+  "description": "Cyfrowy System Dominacji Pojazdu (CSDP) dla Renault Megane III Grandtour 1.5 dCi Bose Edition (K9K 636, TL4, KZ14).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
