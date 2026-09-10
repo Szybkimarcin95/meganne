@@ -37,6 +37,47 @@ enum class OverlordTab(val title: String) {
     ARSENAL("Arsenał")
 }
 
+internal fun findDtcByCatalogAlias(dtcDatabase: List<DtcCode>, ecuCode: String): DtcCode? {
+    val normalizedCode = ecuCode.trim()
+    if (normalizedCode.isBlank()) return null
+
+    return dtcDatabase.firstOrNull { dtc ->
+        dtc.code.split('/').any { alias ->
+            alias.trim().equals(normalizedCode, ignoreCase = true)
+        }
+    }
+}
+
+internal fun resolveStoredDtc(dtcDatabase: List<DtcCode>, code: String): DtcCode {
+    return findDtcByCatalogAlias(dtcDatabase, code)
+        ?: DtcCode(
+            code = code,
+            system = "Standard OBD-II",
+            title = "Usterka zarejestrowana w ECU ($code)",
+            severity = DtcSeverity.HIGH,
+            symptoms = listOf("Kontrolka Check Engine (MIL) aktywna"),
+            rootCauses = listOf("Wykryto anomalię w podsystemie powertrain"),
+            diagnosticSteps = listOf("Sprawdź parametry zamrożonej ramki (Freeze Frame) oraz czujnik"),
+            urgencyScore = 7,
+            isRenaultSpecific = false
+        )
+}
+
+internal fun resolvePendingDtc(dtcDatabase: List<DtcCode>, code: String): DtcCode {
+    return findDtcByCatalogAlias(dtcDatabase, code)
+        ?: DtcCode(
+            code = code,
+            system = "Standard OBD-II (Oczekujący)",
+            title = "Usterka oczekująca na potwierdzenie ($code)",
+            severity = DtcSeverity.MEDIUM,
+            symptoms = listOf("Brak objawów lub sporadyczna usterka"),
+            rootCauses = listOf("Błąd w trakcie weryfikacji przez monitory ECU"),
+            diagnosticSteps = listOf("Wymaga wykonania pełnego cyklu jazdy"),
+            urgencyScore = 5,
+            isRenaultSpecific = false
+        )
+}
+
 class OverlordViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = OverlordRepository(application)
     private val obdManager = ObdManager(application)
@@ -195,12 +236,7 @@ class OverlordViewModel(application: Application) : AndroidViewModel(application
 
     // DTC Database & Scanner
     val dtcDatabase = repository.getDtcDatabase()
-    private val _activeDtcCodes = MutableStateFlow(
-        listOf(
-            dtcDatabase.first { it.code.contains("DF1012") },
-            dtcDatabase.first { it.code.contains("DF025") }
-        )
-    )
+    private val _activeDtcCodes = MutableStateFlow<List<DtcCode>>(emptyList())
     val activeDtcCodes: StateFlow<List<DtcCode>> = _activeDtcCodes.asStateFlow()
 
     private val _pendingDtcCodes = MutableStateFlow<List<DtcCode>>(emptyList())
@@ -210,39 +246,17 @@ class OverlordViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             val (stored, pending) = obdManager.readTroubleCodes()
             val matchedStored = stored.map { code ->
-                dtcDatabase.find { it.code.equals(code, ignoreCase = true) }
-                    ?: DtcCode(
-                        code = code,
-                        system = "Standard OBD-II",
-                        title = "Usterka zarejestrowana w ECU ($code)",
-                        severity = DtcSeverity.HIGH,
-                        symptoms = listOf("Kontrolka Check Engine (MIL) aktywna"),
-                        rootCauses = listOf("Wykryto anomalię w podsystemie powertrain"),
-                        diagnosticSteps = listOf("Sprawdź parametry zamrożonej ramki (Freeze Frame) oraz czujnik"),
-                        urgencyScore = 7,
-                        isRenaultSpecific = false
-                    )
+                resolveStoredDtc(dtcDatabase, code)
             }
             val matchedPending = pending.map { code ->
-                dtcDatabase.find { it.code.equals(code, ignoreCase = true) }
-                    ?: DtcCode(
-                        code = code,
-                        system = "Standard OBD-II (Oczekujący)",
-                        title = "Usterka oczekująca na potwierdzenie ($code)",
-                        severity = DtcSeverity.MEDIUM,
-                        symptoms = listOf("Brak objawów lub sporadyczna usterka"),
-                        rootCauses = listOf("Błąd w trakcie weryfikacji przez monitory ECU"),
-                        diagnosticSteps = listOf("Wymaga wykonania pełnego cyklu jazdy"),
-                        urgencyScore = 5,
-                        isRenaultSpecific = false
-                    )
+                resolvePendingDtc(dtcDatabase, code)
             }
-            _activeDtcCodes.value = if (matchedStored.isNotEmpty()) matchedStored else _activeDtcCodes.value
+            _activeDtcCodes.value = matchedStored
             _pendingDtcCodes.value = matchedPending
 
             // Log detected DTCs into local fault history for permanent audit trail
             matchedStored.forEach { dtc ->
-                repository.logDiagnosticFault(dtc, DataVerificationStatus.MEASURED, "OBD-II Mode 03 (ECU SID307)")
+                repository.logDiagnosticFault(dtc, DataVerificationStatus.MEASURED, "OBD-II Mode 03")
             }
             matchedPending.forEach { dtc ->
                 repository.logDiagnosticFault(dtc, DataVerificationStatus.MEASURED, "OBD-II Mode 07 (Pending)")
