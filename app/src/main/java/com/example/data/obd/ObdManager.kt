@@ -19,7 +19,7 @@ import kotlin.math.sin
 class ObdManager(private val context: Context) {
     private val scope = CoroutineScope(Dispatchers.IO)
     private var telemetryJob: Job? = null
-    private var transport: DiagnosticTransport? = null
+    internal var transport: DiagnosticTransport? = null
     private var activeDevice: BluetoothDevice? = null
 
     private val _telemetry = MutableStateFlow(LiveTelemetry())
@@ -296,14 +296,20 @@ class ObdManager(private val context: Context) {
      * Reads Mode 03 (Confirmed DTCs) and Mode 07 (Pending DTCs)
      */
     suspend fun readTroubleCodes(): Pair<List<String>, List<String>> {
-        val t = transport
-        if (t == null || !t.isTransportOpen() || _telemetry.value.isSimulated) {
+        if (_telemetry.value.isSimulated) {
             // In simulation, return sample confirmed faults for K9K 636
             val stored = listOf("P0380", "P242F") // Świece żarowe i filtr cząstek stałych
             val pending = listOf("P0101") // Przepływomierz sygnał poza zakresem
             _activeTroubleCodes.value = stored
             _pendingTroubleCodes.value = pending
             return Pair(stored, pending)
+        }
+
+        val t = transport
+        if (t == null || !t.isTransportOpen()) {
+            _activeTroubleCodes.value = emptyList()
+            _pendingTroubleCodes.value = emptyList()
+            return Pair(emptyList(), emptyList())
         }
 
         return try {

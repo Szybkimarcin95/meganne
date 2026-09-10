@@ -78,6 +78,15 @@ internal fun resolvePendingDtc(dtcDatabase: List<DtcCode>, code: String): DtcCod
         )
 }
 
+internal fun resolveDtcHistoryStatus(isSimulatedScan: Boolean): DataVerificationStatus =
+    if (isSimulatedScan) DataVerificationStatus.SIMULATED else DataVerificationStatus.MEASURED
+
+internal fun resolveStoredDtcSource(isSimulatedScan: Boolean): String =
+    if (isSimulatedScan) "OBD-II Mode 03 (Symulacja)" else "OBD-II Mode 03"
+
+internal fun resolvePendingDtcSource(isSimulatedScan: Boolean): String =
+    if (isSimulatedScan) "OBD-II Mode 07 (Pending, Symulacja)" else "OBD-II Mode 07 (Pending)"
+
 class OverlordViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = OverlordRepository(application)
     private val obdManager = ObdManager(application)
@@ -244,6 +253,7 @@ class OverlordViewModel(application: Application) : AndroidViewModel(application
 
     fun scanTroubleCodes() {
         viewModelScope.launch {
+            val isSimulatedScan = telemetry.value.isSimulated
             val (stored, pending) = obdManager.readTroubleCodes()
             val matchedStored = stored.map { code ->
                 resolveStoredDtc(dtcDatabase, code)
@@ -254,12 +264,33 @@ class OverlordViewModel(application: Application) : AndroidViewModel(application
             _activeDtcCodes.value = matchedStored
             _pendingDtcCodes.value = matchedPending
 
+            val scanVerificationStatus =
+                if (isSimulatedScan) {
+                    DataVerificationStatus.SIMULATED
+                } else {
+                    DataVerificationStatus.MEASURED
+                }
+
+            val storedSource =
+                if (isSimulatedScan) {
+                    "OBD-II Mode 03 (Symulacja)"
+                } else {
+                    "OBD-II Mode 03"
+                }
+
+            val pendingSource =
+                if (isSimulatedScan) {
+                    "OBD-II Mode 07 (Pending, Symulacja)"
+                } else {
+                    "OBD-II Mode 07 (Pending)"
+                }
+
             // Log detected DTCs into local fault history for permanent audit trail
             matchedStored.forEach { dtc ->
-                repository.logDiagnosticFault(dtc, DataVerificationStatus.MEASURED, "OBD-II Mode 03")
+                repository.logDiagnosticFault(dtc, scanVerificationStatus, storedSource)
             }
             matchedPending.forEach { dtc ->
-                repository.logDiagnosticFault(dtc, DataVerificationStatus.MEASURED, "OBD-II Mode 07 (Pending)")
+                repository.logDiagnosticFault(dtc, scanVerificationStatus, pendingSource)
             }
         }
     }
@@ -382,7 +413,7 @@ class OverlordViewModel(application: Application) : AndroidViewModel(application
     fun logFaultHistory(
         dtc: DtcCode,
         status: DataVerificationStatus = DataVerificationStatus.MEASURED,
-        source: String = "ECU SID307"
+        source: String = "OBD-II Mode 03"
     ) {
         viewModelScope.launch {
             repository.logDiagnosticFault(dtc, status, source)

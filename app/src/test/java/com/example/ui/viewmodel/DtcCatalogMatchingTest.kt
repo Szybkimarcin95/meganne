@@ -2,9 +2,11 @@ package com.example.ui.viewmodel
 
 import com.example.data.model.DtcCode
 import com.example.data.model.DtcSeverity
+import com.example.data.obd.DataVerificationStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DtcCatalogMatchingTest {
@@ -60,5 +62,34 @@ class DtcCatalogMatchingTest {
         assertEquals("P9999", result.code)
         assertEquals("Standard OBD-II", result.system)
         assertFalse(result.isRenaultSpecific)
+    }
+
+    @Test
+    fun simulatedProvenanceSelectedForSimulationScan() {
+        val status = resolveDtcHistoryStatus(isSimulatedScan = true)
+        val storedSource = resolveStoredDtcSource(isSimulatedScan = true)
+        val pendingSource = resolvePendingDtcSource(isSimulatedScan = true)
+
+        assertEquals(DataVerificationStatus.SIMULATED, status)
+        assertEquals("OBD-II Mode 03 (Symulacja)", storedSource)
+        assertEquals("OBD-II Mode 07 (Pending, Symulacja)", pendingSource)
+        assertFalse(storedSource.contains("SID307", ignoreCase = true))
+        assertFalse(pendingSource.contains("SID307", ignoreCase = true))
+        assertFalse(storedSource.contains("Renault", ignoreCase = true))
+    }
+
+    @Test
+    fun measuredProvenanceSelectedForPhysicalScan() {
+        val status = resolveDtcHistoryStatus(isSimulatedScan = false)
+        val storedSource = resolveStoredDtcSource(isSimulatedScan = false)
+        val pendingSource = resolvePendingDtcSource(isSimulatedScan = false)
+
+        assertEquals(DataVerificationStatus.MEASURED, status)
+        assertEquals("OBD-II Mode 03", storedSource)
+        assertEquals("OBD-II Mode 07 (Pending)", pendingSource)
+        assertFalse(storedSource.contains("Symulacja", ignoreCase = true))
+        assertFalse(pendingSource.contains("Symulacja", ignoreCase = true))
+        assertFalse(storedSource.contains("SID307", ignoreCase = true))
+        assertFalse(pendingSource.contains("SID307", ignoreCase = true))
     }
 }
