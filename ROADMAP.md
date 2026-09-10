@@ -17,11 +17,37 @@ Status: completed for current snapshot
 - sanitize invalid sensor trend mappings
 
 ## Phase 2 — Independent review / synchronization
-Status: next
+Status: active
 - use GitHub as shared source of truth
+- maintain AGENTS/PROJECT_STATE/ROADMAP/PROVENANCE handoff files
 - Codex read-only review of current snapshot
 - compare review against actual code
 - choose one safe implementation checkpoint
+
+## Optional lane A — Second Android telemetry server
+Status: implemented in repository, physical validation pending.
+
+Location:
+`tools/android-telemetry-server/`
+
+Purpose:
+- second Android phone as local Termux server,
+- telemetry mirror/backup over LAN,
+- SQLite WAL history,
+- simple authenticated API,
+- optional SSH and Termux:Boot autostart.
+
+Required physical validation before app integration:
+1. local `/health`,
+2. LAN `/health` from primary phone,
+3. authenticated telemetry POST,
+4. latest-record readback,
+5. operation while screen is locked,
+6. operation after reboot/autostart.
+
+The server must remain separate from ELM327/ECU transport. Do not make the second phone a competing Bluetooth client to the same ELM327.
+
+Future app-side integration, if approved, should be an optional telemetry mirror client and must not replace Room or `DiagnosticTransport`.
 
 ## Phase 3 — Digital Twin foundation
 Only after review:

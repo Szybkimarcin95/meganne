@@ -30,6 +30,29 @@ Wykonano cleanup w dwóch krokach:
 - `DigitalTwinScreen.kt`: usunięto hardcoded fake ELM327 circuit continuity/resistance test.
 - `OverlordViewModel.kt`: unsupported `fuel_filter_primer`, `dpf_differential`, `glow_plugs` nie zapisują już fałszywych trendów; poprawiono komunikat Mode 04.
 
+## Auxiliary second-Android server
+Status: `IMPLEMENTED IN REPO / PHYSICAL VALIDATION PENDING`.
+
+Dodano izolowany katalog:
+`tools/android-telemetry-server/`
+
+Rola:
+`CAR → ELM327 → primary Android app → LAN/Wi-Fi → secondary Android telemetry server`
+
+Serwer:
+- działa w Termux,
+- używa Python standard library,
+- zapisuje telemetrię do SQLite WAL,
+- ma token Bearer dla chronionych endpointów,
+- ma health/latest/NDJSON export,
+- ma install/run/stop/Termux:Boot scripts,
+- nie komunikuje się bezpośrednio z ELM327 ani ECU,
+- nie zastępuje Room ani `DiagnosticTransport`.
+
+GitHub CI dla serwera: PASS po dodaniu funkcjonalności.
+
+Do czasu testu na drugim telefonie nie oznaczać go jako physically validated.
+
 ## Current verified-by-code facts
 `OverlordViewModel.logCurrentSensorSample()` obsługuje obecnie:
 - `turbocharger → boostBar`
@@ -43,6 +66,7 @@ Mode 04 success message wymaga ponownego skanu zamiast deklarowania braku aktywn
 
 ## Known risks / open questions
 - physical ELM327 compatibility nie została potwierdzona na samochodzie,
+- drugi telefon-serwer nie został jeszcze fizycznie zweryfikowany po LAN / lock screen / reboot,
 - dane fuse/wire/OEM wymagają provenance,
 - dokładny SID307 candidate nie jest potwierdzony,
 - wcześniejsze raporty AI były sprzeczne w kwestii Digital Twin graph models,
@@ -60,8 +84,9 @@ Known XML counterparts exist for all above except A40 in the current database in
 ## Current gate
 Do not start Renault-specific WRITE/RESET/CONFIGURATION/ACTUATOR work.
 Do not assume exact SID307 definition match before file-content/ECU-identification evidence.
+Do not integrate the Android app with the second-phone server until the standalone server passes physical LAN validation.
 
 ## Next safe work lane
-1. keep GitHub as synchronization source,
+1. physical setup/test of `tools/android-telemetry-server` on the second phone,
 2. independent Codex read-only review of current snapshot,
-3. after review choose one implementation checkpoint only.
+3. after both checks choose one implementation checkpoint only.
