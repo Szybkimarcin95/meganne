@@ -496,7 +496,7 @@ fun OracleScreen(
                     }
                 }
 
-                // Active DTC header & Clear button
+                // Active DTC header, read scan, and protected clear action
                 item {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -512,15 +512,27 @@ fun OracleScreen(
                             )
                         )
 
-                        if (activeDtc.isNotEmpty()) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Button(
-                                onClick = { showConfirmClearDtc = true },
-                                colors = ButtonDefaults.buttonColors(containerColor = WarningRed, contentColor = Color.White),
+                                onClick = { viewModel.scanTroubleCodes() },
+                                colors = ButtonDefaults.buttonColors(containerColor = CyanHud, contentColor = Color.Black),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
-                                Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("Wyczyść DTC", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text("SKANUJ DTC", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            if (activeDtc.isNotEmpty()) {
+                                Button(
+                                    onClick = { showConfirmClearDtc = true },
+                                    colors = ButtonDefaults.buttonColors(containerColor = WarningRed, contentColor = Color.White),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Wyczyść DTC", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
                     }
