@@ -1,0 +1,73 @@
+#!/data/data/com.termux/files/usr/bin/bash
+set -u
+
+ROOT="${MEGANE_REPO:-$HOME/meganne}"
+STATE="${MEGANE_AI_STATE:-$HOME/.megane-ai}"
+LOOP="$ROOT/tools/ai-autopilot/loop.sh"
+PIDFILE="$STATE/pid"
+
+usage() {
+  echo "Użycie: megane-ai {on|off|status|log|once|doctor|auth}"
+}
+
+alive() {
+  [ -f "$PIDFILE" ] || return 1
+  pid="$(cat "$PIDFILE" 2>/dev/null || true)"
+  [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null
+}
+
+doctor() {
+  echo "repo=$ROOT"
+  test -d "$ROOT/.git" && echo "git_repo=OK" || echo "git_repo=BRAK"
+  command -v node >/dev/null && echo "node=OK" || echo "node=BRAK"
+  command -v gemini >/dev/null && echo "gemini=OK" || echo "gemini=BRAK"
+  test -f "$LOOP" && echo "loop=OK" || echo "loop=BRAK"
+  cd "$ROOT" 2>/dev/null && git status --short --branch
+}
+
+case "${1:-}" in
+  on)
+    mkdir -p "$STATE/logs"
+    if alive; then echo "AUTO=ON pid=$(cat "$PIDFILE")"; exit 0; fi
+    cd "$ROOT" || exit 2
+    if [ -n "$(git status --porcelain)" ]; then
+      echo "JOB STOP: repo ma niezapisane zmiany"; exit 2
+    fi
+    branch="$(git branch --show-current)"
+    if [ "$branch" = "main" ] || [ "$branch" = "master" ]; then
+      new="ai/autopilot-$(date +%Y%m%d-%H%M%S)"
+      git switch -c "$new" || exit 2
+      echo "branch=$new"
+    fi
+    touch "$STATE/enabled"
+    if command -v termux-wake-lock >/dev/null; then termux-wake-lock || true; fi
+    nohup "$LOOP" loop >"$STATE/launcher.log" 2>&1 &
+    echo $! >"$PIDFILE"
+    echo "AUTO=ON pid=$!";;
+
+  off)
+    rm -f "$STATE/enabled"
+    if alive; then
+      pid="$(cat "$PIDFILE")"
+      kill "$pid" 2>/dev/null || true
+    fi
+    rm -f "$PIDFILE"
+    if command -v termux-wake-unlock >/dev/null; then termux-wake-unlock || true; fi
+    echo "AUTO=OFF";;
+  status)
+    if alive; then echo "AUTO=ON pid=$(cat "$PIDFILE")"; else echo "AUTO=OFF"; fi
+    cd "$ROOT" 2>/dev/null && git status --short --branch || true
+    latest="$(ls -1t "$STATE"/logs/run-*.log 2>/dev/null | head -1 || true)"
+    [ -n "$latest" ] && echo "log=$latest";;
+  log)
+    latest="$(ls -1t "$STATE"/logs/run-*.log 2>/dev/null | head -1 || true)"
+    [ -n "$latest" ] && tail -n 120 "$latest" || echo "Brak logu";;
+  once)
+    "$LOOP" --once;;
+  doctor)
+    doctor;;
+  auth)
+    exec env TERMUX_VERSION="${TERMUX_VERSION:-0.118.3}" node "$(command -v gemini)";;
+  *)
+    usage; exit 1;;
+esac
