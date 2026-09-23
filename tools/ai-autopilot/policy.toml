@@ -1,0 +1,44 @@
+# Project-scoped Gemini CLI policy for headless AUTO mode.
+# auto_edit handles repository file edits; this file only auto-allows selected shell commands.
+
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = ["git status", "git diff", "git log", "git show", "git grep", "git ls-files", "git rev-parse", "git add", "git commit"]
+decision = "allow"
+priority = 100
+interactive = false
+
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = ["./gradlew", "gradle", "grep", "find", "ls", "pwd", "sed", "cat", "head", "tail", "wc"]
+decision = "allow"
+priority = 100
+interactive = false
+
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = ["git push", "git reset", "git clean", "git checkout", "git restore", "git rebase", "git merge", "git branch -D"]
+decision = "deny"
+priority = 900
+denyMessage = "AUTOPILOT HARD STOP: destructive or remote Git operation is blocked."
+
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = ["rm", "rmdir", "chmod", "chown", "curl", "wget", "ssh", "scp", "adb", "fastboot", "su", "sudo", "dd", "mkfs", "apt", "pkg", "npm install", "pip install"]
+decision = "deny"
+priority = 900
+denyMessage = "AUTOPILOT HARD STOP: command is outside the approved development allowlist."
+
+[[rule]]
+toolName = ["write_file", "replace"]
+argsPattern = '"file_path":".*(\\.env|authorized_keys|id_rsa|id_ed25519|credentials|secrets).*"'
+decision = "deny"
+priority = 900
+denyMessage = "AUTOPILOT HARD STOP: secret or credential file modification is forbidden."
+
+[[rule]]
+toolName = "web_fetch"
+decision = "deny"
+priority = 200
+interactive = false
+denyMessage = "Use repository evidence only during unattended iterations."
