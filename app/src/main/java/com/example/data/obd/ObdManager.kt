@@ -20,6 +20,11 @@ class ObdManager(private val context: Context) {
     private val scope = CoroutineScope(Dispatchers.IO)
     private var telemetryJob: Job? = null
     internal var transport: DiagnosticTransport? = null
+        set(value) {
+            field = value
+            safeSession = value?.let { SafeDiagnosticSession(it) }
+        }
+    internal var safeSession: SafeDiagnosticSession? = null
     private var activeDevice: BluetoothDevice? = null
 
     private val _telemetry = MutableStateFlow(LiveTelemetry())
@@ -156,7 +161,9 @@ class ObdManager(private val context: Context) {
             val elmTransport = Elm327Transport(device)
             transport = elmTransport
 
-            val openSuccess = elmTransport.open()
+            val session = safeSession ?: SafeDiagnosticSession(elmTransport)
+
+            val openSuccess = session.open()
             if (!openSuccess) {
                 _connectionState.value = ObdConnectionState.ERROR
                 _connectionStatus.value = "Błąd połączenia z adapterem Bluetooth. Powrót do symulacji."
@@ -168,16 +175,16 @@ class ObdManager(private val context: Context) {
             _connectionState.value = ObdConnectionState.CONNECTED
             _connectionStatus.value = "Inicjalizacja ELM327 (${device.name ?: "OBD"})..."
 
-            // ELM327 initialization protocol sequence with error verification
-            val resetResp = elmTransport.sendCommand("ATZ", 1200)
+            // ELM327 initialization protocol sequence with error verification & firewall protection
+            session.executeCommand("ATZ", 1200)
             delay(300)
-            elmTransport.sendCommand("ATE0", 800) // Echo off
+            session.executeCommand("ATE0", 800) // Echo off
             delay(150)
-            elmTransport.sendCommand("ATL0", 800) // Linefeeds off
+            session.executeCommand("ATL0", 800) // Linefeeds off
             delay(150)
-            elmTransport.sendCommand("ATS0", 800) // Spaces off
+            session.executeCommand("ATS0", 800) // Spaces off
             delay(150)
-            elmTransport.sendCommand("ATSP0", 1500) // Auto protocol search
+            session.executeCommand("ATSP0", 1500) // Auto protocol search
 
             _connectionState.value = ObdConnectionState.READING
             _connectionStatus.value = "Połączono fizycznie z ELM327. Odczyt OBD-II..."
@@ -187,47 +194,55 @@ class ObdManager(private val context: Context) {
                 dataSource = DataVerificationStatus.MEASURED
             )
 
-            startLiveObdPolling(elmTransport)
+            startLiveObdPolling(session)
         }
     }
 
-    private fun startLiveObdPolling(transport: DiagnosticTransport) {
+    private fun startLiveObdPolling(session: SafeDiagnosticSession) {
         telemetryJob = scope.launch {
             var consecutiveFailures = 0
 
-            while (isActive && transport.isTransportOpen()) {
+            while (isActive && session.isTransportOpen()) {
                 try {
-                    // Standard OBD-II Mode 01 PIDs:
+                    // Standard OBD-II Mode 01 PIDs safely executed through firewall
                     // 010C: RPM
-                    val rpmRaw = transport.sendCommand("010C", 1000)
+                    val rpmExec = session.executeCommand("010C", 1000)
+                    val rpmRaw = (rpmExec as? DiagnosticExecutionResult.Success)?.rawResponse ?: ""
                     val rpmResult = ObdParser.parseMode01("010C", rpmRaw)
 
                     // 010D: Speed
-                    val speedRaw = transport.sendCommand("010D", 800)
+                    val speedExec = session.executeCommand("010D", 800)
+                    val speedRaw = (speedExec as? DiagnosticExecutionResult.Success)?.rawResponse ?: ""
                     val speedResult = ObdParser.parseMode01("010D", speedRaw)
 
                     // 0105: Coolant Temp
-                    val coolantRaw = transport.sendCommand("0105", 800)
+                    val coolantExec = session.executeCommand("0105", 800)
+                    val coolantRaw = (coolantExec as? DiagnosticExecutionResult.Success)?.rawResponse ?: ""
                     val coolantResult = ObdParser.parseMode01("0105", coolantRaw)
 
                     // 010F: Intake Air Temp
-                    val iatRaw = transport.sendCommand("010F", 800)
+                    val iatExec = session.executeCommand("010F", 800)
+                    val iatRaw = (iatExec as? DiagnosticExecutionResult.Success)?.rawResponse ?: ""
                     val iatResult = ObdParser.parseMode01("010F", iatRaw)
 
                     // 0110: MAF
-                    val mafRaw = transport.sendCommand("0110", 800)
+                    val mafExec = session.executeCommand("0110", 800)
+                    val mafRaw = (mafExec as? DiagnosticExecutionResult.Success)?.rawResponse ?: ""
                     val mafResult = ObdParser.parseMode01("0110", mafRaw)
 
                     // 0104: Engine Load
-                    val loadRaw = transport.sendCommand("0104", 800)
+                    val loadExec = session.executeCommand("0104", 800)
+                    val loadRaw = (loadExec as? DiagnosticExecutionResult.Success)?.rawResponse ?: ""
                     val loadResult = ObdParser.parseMode01("0104", loadRaw)
 
                     // 0111: Throttle Position
-                    val throttleRaw = transport.sendCommand("0111", 800)
+                    val throttleExec = session.executeCommand("0111", 800)
+                    val throttleRaw = (throttleExec as? DiagnosticExecutionResult.Success)?.rawResponse ?: ""
                     val throttleResult = ObdParser.parseMode01("0111", throttleRaw)
 
                     // 010B: MAP
-                    val mapRaw = transport.sendCommand("010B", 800)
+                    val mapExec = session.executeCommand("010B", 800)
+                    val mapRaw = (mapExec as? DiagnosticExecutionResult.Success)?.rawResponse ?: ""
                     val mapResult = ObdParser.parseMode01("010B", mapRaw)
 
                     if (rpmResult == null && speedResult == null && coolantResult == null) {
@@ -305,20 +320,22 @@ class ObdManager(private val context: Context) {
             return Pair(stored, pending)
         }
 
-        val t = transport
-        if (t == null || !t.isTransportOpen()) {
+        val session = safeSession
+        if (session == null || !session.isTransportOpen()) {
             _activeTroubleCodes.value = emptyList()
             _pendingTroubleCodes.value = emptyList()
             return Pair(emptyList(), emptyList())
         }
 
         return try {
-            // Mode 03: Stored DTCs
-            val mode03Resp = t.sendCommand("03", 2000)
+            // Mode 03: Stored DTCs (Safely executed through CommandFirewall)
+            val mode03Exec = session.executeCommand("03", 2000)
+            val mode03Resp = (mode03Exec as? DiagnosticExecutionResult.Success)?.rawResponse ?: ""
             val storedCodes = ObdParser.parseDtcResponse(mode03Resp, "43")
 
-            // Mode 07: Pending DTCs
-            val mode07Resp = t.sendCommand("07", 2000)
+            // Mode 07: Pending DTCs (Safely executed through CommandFirewall)
+            val mode07Exec = session.executeCommand("07", 2000)
+            val mode07Resp = (mode07Exec as? DiagnosticExecutionResult.Success)?.rawResponse ?: ""
             val pendingCodes = ObdParser.parseDtcResponse(mode07Resp, "47")
 
             _activeTroubleCodes.value = storedCodes
@@ -330,19 +347,19 @@ class ObdManager(private val context: Context) {
     }
 
     /**
-     * Clears Diagnostic Trouble Codes using Mode 04
+     * Clears Diagnostic Trouble Codes using Mode 04 (Protected action)
      */
     suspend fun clearTroubleCodes(): Boolean {
-        val t = transport
-        if (t == null || !t.isTransportOpen() || _telemetry.value.isSimulated) {
+        val session = safeSession
+        if (session == null || !session.isTransportOpen() || _telemetry.value.isSimulated) {
             _activeTroubleCodes.value = emptyList()
             _pendingTroubleCodes.value = emptyList()
             return true
         }
 
         return try {
-            val response = t.sendCommand("04", 3000)
-            val clean = ObdParser.cleanResponse(response)
+            val execResult = session.executeCommand("04", 3000, allowMode04Clear = true)
+            val clean = (execResult as? DiagnosticExecutionResult.Success)?.cleanedResponse ?: ""
             val success = clean.contains("44") || clean.contains("OK")
             if (success) {
                 _activeTroubleCodes.value = emptyList()
@@ -361,14 +378,30 @@ class ObdManager(private val context: Context) {
 
     fun disconnect() {
         stopActiveJobs()
+        val sessionToClose = safeSession
+        transport = null
+        safeSession = null
         scope.launch {
             try {
-                transport?.close()
+                sessionToClose?.close()
             } catch (_: Exception) {}
-            transport = null
         }
         _connectionState.value = ObdConnectionState.DISCONNECTED
-        _telemetry.value = _telemetry.value.copy(isConnected = false)
+        _activeTroubleCodes.value = emptyList()
+        _pendingTroubleCodes.value = emptyList()
+        _telemetry.value = _telemetry.value.copy(
+            isConnected = false,
+            isSimulated = false,
+            dataSource = DataVerificationStatus.UNVERIFIED
+        )
         _connectionStatus.value = "Rozłączono"
+    }
+
+    internal fun setSimulationMode(enabled: Boolean) {
+        stopActiveJobs()
+        _telemetry.value = _telemetry.value.copy(
+            isSimulated = enabled,
+            dataSource = if (enabled) DataVerificationStatus.SIMULATED else DataVerificationStatus.UNVERIFIED
+        )
     }
 }

@@ -50,8 +50,8 @@ class ObdManagerDtcProvenanceTest {
 
         val mockTransport = MockDiagnosticTransport()
         mockTransport.open()
-        mockTransport.mockResponses["03"] = "43 01 03 80 00 00 00 00>" // P0380
-        mockTransport.mockResponses["07"] = "47 01 01 01 00 00 00 00>" // P0101
+        mockTransport.mockResponses["03"] = "43 03 80 00 00 00 00>" // P0380
+        mockTransport.mockResponses["07"] = "47 01 01 00 00 00 00>" // P0101
 
         manager.transport = mockTransport
 

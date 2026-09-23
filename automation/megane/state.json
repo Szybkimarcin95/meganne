@@ -1,0 +1,8 @@
+{
+  "worker_state": "PAUSED_PLATFORM_LIMIT",
+  "checkpoint": "CP3",
+  "run_id": "run-20260923-02",
+  "heartbeat_at_utc": "2026-09-23T23:23:45Z",
+  "last_result": "PASS",
+  "blocker": "CP2_EXTERNAL_FILES_MISSING"
+}

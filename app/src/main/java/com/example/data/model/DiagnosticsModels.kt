@@ -123,3 +123,34 @@ data class DiagnosticFaultHistoryEntry(
     val source: String = "ECU SID307"
 )
 
+enum class HealthCheckStatus(val label: String, val colorHex: Long) {
+    PASS("SPRAWNY", 0xFF00E676),
+    WARNING("OSTRZEŻENIE", 0xFFFFEA00),
+    ALERT("KRYTYCZNY", 0xFFFF1744),
+    INFO("INFORMACJA", 0xFF00E5FF),
+    UNKNOWN("NIEZNANY", 0xFF888888)
+}
+
+data class HealthCheckItem(
+    val id: String,
+    val name: String,
+    val subsystem: String,
+    val status: HealthCheckStatus,
+    val measuredValue: String,
+    val nominalRange: String,
+    val message: String
+)
+
+data class DiagnosticCheckReport(
+    val timestamp: Long = System.currentTimeMillis(),
+    val overallStatus: HealthCheckStatus,
+    val isSimulated: Boolean,
+    val isConnected: Boolean,
+    val activeDtcCount: Int,
+    val pendingDtcCount: Int,
+    val historyFaultsCount: Int,
+    val checks: List<HealthCheckItem>,
+    val summaryRecommendation: String
+)
+
+

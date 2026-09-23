@@ -1,0 +1,41 @@
+{
+  "backlog": [
+    {
+      "id": "CP0",
+      "title": "Rzeczywisty audyt tylko do odczytu",
+      "status": "COMPLETED",
+      "dependencies": []
+    },
+    {
+      "id": "CP1",
+      "title": "Punkt odtworzenia i sterowanie",
+      "status": "COMPLETED",
+      "dependencies": ["CP0"]
+    },
+    {
+      "id": "CP2",
+      "title": "Importer i pochodzenie danych",
+      "status": "BLOCKED",
+      "dependencies": ["CP1"],
+      "blocker": "EXTERNAL_FILES_MISSING (ECUU.zip, OBD-II.txt, exported_records not in filesystem)"
+    },
+    {
+      "id": "CP3",
+      "title": "Komunikacja read-only",
+      "status": "COMPLETED",
+      "dependencies": ["CP2"]
+    },
+    {
+      "id": "CP4",
+      "title": "System Health i raporty",
+      "status": "PENDING",
+      "dependencies": ["CP3"]
+    },
+    {
+      "id": "CP5",
+      "title": "Regresja i przekazanie",
+      "status": "PENDING",
+      "dependencies": ["CP4"]
+    }
+  ]
+}

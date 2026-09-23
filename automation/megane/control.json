@@ -1,0 +1,12 @@
+{
+  "desired_enabled": false,
+  "mode": "AUTONOMOUS_CHECKPOINT",
+  "hardware_io": false,
+  "active_options": {
+    "dry_run": false,
+    "log_level": "INFO",
+    "allow_file_import": true,
+    "hardware_io": false
+  },
+  "revision": 3
+}

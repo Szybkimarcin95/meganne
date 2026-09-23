@@ -26,7 +26,9 @@ import androidx.compose.material.icons.filled.BluetoothDisabled
 import androidx.compose.material.icons.filled.BluetoothSearching
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
@@ -57,13 +59,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.data.model.DiagnosticCheckReport
 import com.example.data.model.DiagnosticFaultHistoryEntry
 import com.example.data.model.DtcCode
+import com.example.data.model.HealthCheckItem
+import com.example.data.model.HealthCheckStatus
 import com.example.ui.components.BluetoothConnectionIndicator
 import com.example.ui.components.CockpitGauge
 import com.example.ui.theme.AmberBose
@@ -99,6 +106,10 @@ fun OracleScreen(
     val dtcSearch by viewModel.dtcSearchQuery.collectAsStateWithLifecycle()
     val selectedDtc by viewModel.selectedDtc.collectAsStateWithLifecycle()
     val clearSuccess by viewModel.clearDtcSuccess.collectAsStateWithLifecycle()
+    val clipboardManager = LocalClipboardManager.current
+    val diagnosticReport by viewModel.diagnosticCheckReport.collectAsStateWithLifecycle()
+    val isDiagnosticRunning by viewModel.isDiagnosticCheckRunning.collectAsStateWithLifecycle()
+    var copySuccessMessage by remember { mutableStateOf<String?>(null) }
 
     var showBluetoothDialog by remember { mutableStateOf(false) }
     var showConfirmClearDtc by remember { mutableStateOf(false) }
@@ -496,6 +507,111 @@ fun OracleScreen(
                     }
                 }
 
+                // Banner if report copied to clipboard
+                copySuccessMessage?.let { msg ->
+                    item {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = CyanHud.copy(alpha = 0.15f)),
+                            border = CardDefaults.outlinedCardBorder().copy(brush = Brush.horizontalGradient(listOf(CyanHud, Color(0xFF005577)))),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(12.dp)
+                            ) {
+                                Icon(Icons.Default.Check, contentDescription = null, tint = CyanHud)
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(msg, color = CyanHud, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                                IconButton(onClick = { copySuccessMessage = null }) {
+                                    Icon(Icons.Default.Close, contentDescription = null, tint = CyanHud)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Health Check / System Diagnostics card
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = CockpitSurface),
+                        shape = RoundedCornerShape(14.dp),
+                        border = CardDefaults.outlinedCardBorder().copy(
+                            brush = Brush.horizontalGradient(listOf(AmberBose.copy(alpha = 0.6f), CockpitBorder))
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        "DIAGNOSTYKA STANU POJAZDU (HEALTH CHECK)",
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = AmberBose,
+                                            letterSpacing = 1.sp
+                                        )
+                                    )
+                                    Text(
+                                        "Kompleksowy test 7 podsystemów K9K 636 i pamięci ECU",
+                                        style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary, fontSize = 11.sp)
+                                    )
+                                }
+
+                                Button(
+                                    onClick = { viewModel.runDiagnosticCheck() },
+                                    enabled = !isDiagnosticRunning,
+                                    colors = ButtonDefaults.buttonColors(containerColor = AmberBose, contentColor = Color.Black),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    if (isDiagnosticRunning) {
+                                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("TESTOWANIE...", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    } else {
+                                        Icon(Icons.Default.HealthAndSafety, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("URUCHOM TEST", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+
+                            if (isDiagnosticRunning) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                LinearProgressIndicator(
+                                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)),
+                                    color = AmberBose,
+                                    trackColor = CockpitSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    "Wykonywanie testów podsystemów i odczyt kodów DTC z ECU...",
+                                    style = MaterialTheme.typography.labelSmall.copy(color = TextMuted, fontSize = 10.sp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Visual Report Card if diagnostic check was run
+                diagnosticReport?.let { report ->
+                    item {
+                        DiagnosticReportCard(
+                            report = report,
+                            onDismiss = { viewModel.dismissDiagnosticCheckReport() },
+                            onCopy = {
+                                val summary = viewModel.generateDtcHistorySummary()
+                                clipboardManager.setText(AnnotatedString(summary))
+                                copySuccessMessage = "Skopiowano raport diagnostyczny do schowka"
+                            }
+                        )
+                    }
+                }
+
                 // Active DTC header, read scan, and protected clear action
                 item {
                     Row(
@@ -617,14 +733,29 @@ fun OracleScreen(
                                     )
                                 )
                             }
-                            if (faultHistory.isNotEmpty()) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 TextButton(
-                                    onClick = { showConfirmClearFaultHistory = true },
-                                    colors = ButtonDefaults.textButtonColors(contentColor = WarningRed.copy(alpha = 0.8f))
+                                    onClick = {
+                                        val summary = viewModel.generateDtcHistorySummary()
+                                        clipboardManager.setText(AnnotatedString(summary))
+                                        copySuccessMessage = "Skopiowano pełny raport diagnostyczny do schowka"
+                                    },
+                                    colors = ButtonDefaults.textButtonColors(contentColor = CyanHud)
                                 ) {
-                                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(15.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Wyczyść historię", fontSize = 11.sp)
+                                    Text("Kopiuj raport", fontSize = 11.sp)
+                                }
+
+                                if (faultHistory.isNotEmpty()) {
+                                    TextButton(
+                                        onClick = { showConfirmClearFaultHistory = true },
+                                        colors = ButtonDefaults.textButtonColors(contentColor = WarningRed.copy(alpha = 0.8f))
+                                    ) {
+                                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(15.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Wyczyść", fontSize = 11.sp)
+                                    }
                                 }
                             }
                         }
@@ -1024,3 +1155,162 @@ fun DtcDetailDialog(
         }
     )
 }
+
+@Composable
+fun DiagnosticReportCard(
+    report: DiagnosticCheckReport,
+    onDismiss: () -> Unit,
+    onCopy: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val dateFmt = remember { SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()) }
+    val formattedTime = remember(report.timestamp) { dateFmt.format(Date(report.timestamp)) }
+    val statusColor = Color(report.overallStatus.colorHex)
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = CockpitSurface),
+        shape = RoundedCornerShape(14.dp),
+        border = CardDefaults.outlinedCardBorder().copy(
+            brush = Brush.horizontalGradient(listOf(statusColor.copy(alpha = 0.8f), CockpitBorder))
+        ),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            // Header
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(statusColor.copy(alpha = 0.2f))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = report.overallStatus.label,
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                color = statusColor,
+                                fontWeight = FontWeight.Black
+                            )
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "RAPORT DIAGNOSTYCZNY",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary,
+                            letterSpacing = 0.5.sp
+                        )
+                    )
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onCopy, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = "Kopiuj raport", tint = CyanHud, modifier = Modifier.size(16.dp))
+                    }
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Zamknij raport", tint = TextMuted, modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = report.summaryRecommendation,
+                style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary, fontWeight = FontWeight.Medium)
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "ECU DTC: ${report.activeDtcCount} aktywnych | ${report.pendingDtcCount} oczek.",
+                    style = MaterialTheme.typography.labelSmall.copy(color = TextMuted, fontSize = 10.sp)
+                )
+                Text(
+                    text = if (report.isSimulated) "Tryb: Symulacja" else "Tryb: Pomiar OBD-II",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = if (report.isSimulated) AmberBose else DiagnosticGreen,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+                Text(
+                    text = formattedTime,
+                    style = MaterialTheme.typography.labelSmall.copy(color = TextMuted, fontSize = 10.sp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = "SZCZEGÓŁOWY TEST PODSYSTEMÓW:",
+                style = MaterialTheme.typography.labelSmall.copy(color = CyanHud, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Subsystem health checks
+            report.checks.forEach { check ->
+                val checkColor = Color(check.status.colorHex)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 3.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(CockpitSurfaceVariant)
+                        .border(1.dp, checkColor.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
+                        .padding(8.dp)
+                ) {
+                    Column {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = check.name,
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = TextPrimary)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(checkColor.copy(alpha = 0.2f))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = check.status.label,
+                                    style = MaterialTheme.typography.labelSmall.copy(color = checkColor, fontWeight = FontWeight.Bold, fontSize = 9.sp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "Wartość: ${check.measuredValue}",
+                                style = MaterialTheme.typography.labelSmall.copy(color = CyanHud, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                            )
+                            Text(
+                                text = "Norma: ${check.nominalRange}",
+                                style = MaterialTheme.typography.labelSmall.copy(color = TextMuted, fontSize = 9.sp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = check.message,
+                            style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary, fontSize = 10.sp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
