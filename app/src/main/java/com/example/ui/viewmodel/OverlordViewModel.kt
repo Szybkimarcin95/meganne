@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.model.DiagnosticCheckReport
 import com.example.data.model.DiagnosticFaultHistoryEntry
 import com.example.data.model.DtcCode
+import com.example.data.model.DtcScanState
 import com.example.data.model.DtcSeverity
 import com.example.data.model.EngineComponent
 import com.example.data.model.FuelRecord
@@ -31,6 +32,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -477,46 +479,74 @@ class OverlordViewModel(application: Application) : AndroidViewModel(application
     private val _pendingDtcCodes = MutableStateFlow<List<DtcCode>>(emptyList())
     val pendingDtcCodes: StateFlow<List<DtcCode>> = _pendingDtcCodes.asStateFlow()
 
+    private val _dtcScanState = MutableStateFlow(DtcScanState.NOT_RUN)
+    val dtcScanState: StateFlow<DtcScanState> = _dtcScanState.asStateFlow()
+
+    val hasDtcScanRun: StateFlow<Boolean> = _dtcScanState
+        .map { it == DtcScanState.COMPLETED }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     fun scanTroubleCodes() {
         viewModelScope.launch {
-            val isSimulatedScan = telemetry.value.isSimulated
-            val (stored, pending) = obdManager.readTroubleCodes()
-            val matchedStored = stored.map { code ->
-                resolveStoredDtc(dtcDatabase, code)
-            }
-            val matchedPending = pending.map { code ->
-                resolvePendingDtc(dtcDatabase, code)
-            }
-            _activeDtcCodes.value = matchedStored
-            _pendingDtcCodes.value = matchedPending
+            _dtcScanState.value = DtcScanState.RUNNING
+            try {
+                val isSimulatedScan = telemetry.value.isSimulated
+                val isConnectedScan = telemetry.value.isConnected
 
-            val scanVerificationStatus =
-                if (isSimulatedScan) {
-                    DataVerificationStatus.SIMULATED
-                } else {
-                    DataVerificationStatus.MEASURED
+                // If physical hardware scan requested without connection or active reading, mark FAILED
+                if (!isSimulatedScan && (!isConnectedScan || (connectionState.value != ObdConnectionState.READING && connectionState.value != ObdConnectionState.CONNECTED))) {
+                    _dtcScanState.value = DtcScanState.FAILED
+                    return@launch
                 }
 
-            val storedSource =
-                if (isSimulatedScan) {
-                    "OBD-II Mode 03 (Symulacja)"
-                } else {
-                    "OBD-II Mode 03"
+                val (stored, pending) = obdManager.readTroubleCodes()
+
+                // If not simulated, ensure session was actually open and operational
+                if (!isSimulatedScan && (obdManager.safeSession?.isTransportOpen() != true)) {
+                    _dtcScanState.value = DtcScanState.FAILED
+                    return@launch
                 }
 
-            val pendingSource =
-                if (isSimulatedScan) {
-                    "OBD-II Mode 07 (Pending, Symulacja)"
-                } else {
-                    "OBD-II Mode 07 (Pending)"
+                val matchedStored = stored.map { code ->
+                    resolveStoredDtc(dtcDatabase, code)
                 }
+                val matchedPending = pending.map { code ->
+                    resolvePendingDtc(dtcDatabase, code)
+                }
+                _activeDtcCodes.value = matchedStored
+                _pendingDtcCodes.value = matchedPending
+                _dtcScanState.value = DtcScanState.COMPLETED
 
-            // Log detected DTCs into local fault history for permanent audit trail
-            matchedStored.forEach { dtc ->
-                repository.logDiagnosticFault(dtc, scanVerificationStatus, storedSource)
-            }
-            matchedPending.forEach { dtc ->
-                repository.logDiagnosticFault(dtc, scanVerificationStatus, pendingSource)
+                val scanVerificationStatus =
+                    if (isSimulatedScan) {
+                        DataVerificationStatus.SIMULATED
+                    } else {
+                        DataVerificationStatus.MEASURED
+                    }
+
+                val storedSource =
+                    if (isSimulatedScan) {
+                        "OBD-II Mode 03 (Symulacja)"
+                    } else {
+                        "OBD-II Mode 03"
+                    }
+
+                val pendingSource =
+                    if (isSimulatedScan) {
+                        "OBD-II Mode 07 (Pending, Symulacja)"
+                    } else {
+                        "OBD-II Mode 07 (Pending)"
+                    }
+
+                // Log detected DTCs into local fault history for permanent audit trail
+                matchedStored.forEach { dtc ->
+                    repository.logDiagnosticFault(dtc, scanVerificationStatus, storedSource)
+                }
+                matchedPending.forEach { dtc ->
+                    repository.logDiagnosticFault(dtc, scanVerificationStatus, pendingSource)
+                }
+            } catch (e: Exception) {
+                _dtcScanState.value = DtcScanState.FAILED
             }
         }
     }
@@ -547,6 +577,7 @@ class OverlordViewModel(application: Application) : AndroidViewModel(application
             if (cleared) {
                 _activeDtcCodes.value = emptyList()
                 _pendingDtcCodes.value = emptyList()
+                _dtcScanState.value = DtcScanState.NOT_RUN
                 _clearDtcSuccess.value = "Polecenie kasowania kodów DTC zostało wykonane. Wykonaj ponowny skan, aby sprawdzić aktualny stan usterek."
             } else {
                 _clearDtcSuccess.value = "Nie udało się skasować kodów błędów. Upewnij się, że zapłon jest włączony, a silnik zgaszony."

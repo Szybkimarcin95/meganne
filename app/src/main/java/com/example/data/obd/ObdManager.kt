@@ -358,7 +358,7 @@ class ObdManager(private val context: Context) {
         }
 
         return try {
-            val execResult = session.executeCommand("04", 3000, allowMode04Clear = true)
+            val execResult = session.executeCommand("04", 3000)
             val clean = (execResult as? DiagnosticExecutionResult.Success)?.cleanedResponse ?: ""
             val success = clean.contains("44") || clean.contains("OK")
             if (success) {

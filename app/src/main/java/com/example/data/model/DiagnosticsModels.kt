@@ -131,6 +131,13 @@ enum class HealthCheckStatus(val label: String, val colorHex: Long) {
     UNKNOWN("NIEZNANY", 0xFF888888)
 }
 
+enum class DtcScanState(val label: String) {
+    NOT_RUN("SKAN NIEWYKONANY"),
+    RUNNING("SKANOWANIE"),
+    COMPLETED("ZAKOŃCZONY"),
+    FAILED("BŁĄD SKANU")
+}
+
 data class HealthCheckItem(
     val id: String,
     val name: String,

@@ -11,135 +11,141 @@ sealed class CommandValidationResult {
 }
 
 /**
- * Command Firewall for ELM327 / OBD-II / Renault UDS Diagnostic Transport.
+ * Command Firewall for ELM327 / OBD-II Diagnostic Transport.
  *
- * Enforces strict read-only policy:
- * - Allows only safe AT commands (setup, configuration, voltage)
- * - Allows standard OBD-II read modes (Mode 01, 02, 03, 07, 09)
- * - Allows verified Renault UDS Read services (0x22 ReadDataByIdentifier, 0x19 ReadDTCInformation)
- * - Strict prohibition of write (0x2E, 0x3D), actuator tests (0x2F, 0x30, 0x31),
- *   security access (0x27), and ECU resets (0x11).
- * - Mode 04 (Clear DTC) requires explicit authorization flag.
+ * Enforces strict READ_ONLY policy under CP3A (Least Privilege):
+ * - Allows ONLY AT commands present in current production code (ATZ, ATE0, ATL0, ATS0, ATSP0)
+ * - Allows ONLY standard OBD-II Mode 01 PIDs used by current production telemetry
+ * - Allows ONLY standard OBD-II DTC Read commands (Mode 03, Mode 07)
+ * - Blocks Mode 04 (Clear DTC) under READ_ONLY policy
+ * - Explicitly blocks dangerous state-changing services (0x11, 0x27, 0x2E, 0x2F, 0x30, 0x31, 0x34, 0x36, 0x37, 0x3D)
+ * - Blocks unverified candidate commands (ATSP6, ATSH, ATCRA, UDS 0x19, UDS 0x22) as BLOCKED_PENDING_SOURCE_VERIFICATION
  */
 object CommandFirewall {
 
-    // Whitelist of supported AT command prefixes
-    private val ALLOWED_AT_PREFIXES = setOf(
-        "ATZ", "ATE0", "ATE1", "ATL0", "ATL1", "ATS0", "ATS1",
-        "ATSP0", "ATSP6", "ATRV", "ATCRA", "ATSH", "ATST",
-        "ATBD", "ATI", "ATDP", "ATDPN", "ATCAF0", "ATCAF1"
+    // Whitelist of AT commands strictly required by current production code:
+    // Verified in ObdManager.kt initialization sequence.
+    val ALLOWED_AT_COMMANDS = setOf(
+        "ATZ",
+        "ATE0",
+        "ATL0",
+        "ATS0",
+        "ATSP0"
     )
 
-    // Allowed Renault UDS Read DIDs (Service 0x22)
-    // Confirmed in SID307 candidate profiles
-    private val ALLOWED_UDS_READ_DIDS = setOf(
-        "2001", // Coolant temperature
-        "2002", // Engine RPM
-        "2028"  // MIL warning state
+    // Whitelist of standard OBD-II Mode 01 PIDs strictly used by current production:
+    // Verified in ObdManager.kt startLiveObdPolling():
+    // 010C: RPM, 010D: Speed, 0105: Coolant Temp, 010F: Intake Air Temp,
+    // 0110: MAF, 0104: Engine Load, 0111: Throttle Position, 010B: MAP
+    val ALLOWED_MODE01_PIDS = setOf(
+        "010C",
+        "010D",
+        "0105",
+        "010F",
+        "0110",
+        "0104",
+        "0111",
+        "010B"
     )
 
-    fun validate(rawCommand: String, allowMode04Clear: Boolean = false): CommandValidationResult {
+    // Whitelist of standard OBD-II DTC Read commands:
+    // 03: Mode 03 (Stored DTCs), 07: Mode 07 (Pending DTCs)
+    val ALLOWED_DTC_READ_COMMANDS = setOf(
+        "03",
+        "07"
+    )
+
+    fun validate(rawCommand: String): CommandValidationResult {
         val clean = rawCommand.trim().replace(" ", "").uppercase(Locale.ROOT)
         if (clean.isEmpty()) {
             return CommandValidationResult.Blocked(rawCommand, "Pusta komenda")
         }
 
-        // 1. AT Commands
-        if (clean.startsWith("AT")) {
-            val matchedPrefix = ALLOWED_AT_PREFIXES.firstOrNull { clean.startsWith(it) }
-            return if (matchedPrefix != null) {
-                CommandValidationResult.Allowed(clean, "ELM327_AT_INIT")
-            } else {
-                CommandValidationResult.Blocked(rawCommand, "Niedozwolona lub nieznana komenda AT")
-            }
-        }
-
-        // 2. Mode 04 Protected Clear
-        if (clean == "04") {
-            return if (allowMode04Clear) {
-                CommandValidationResult.Allowed(clean, "OBD2_MODE04_CLEAR_AUTHORIZED")
-            } else {
-                CommandValidationResult.Blocked(rawCommand, "Mode 04 (Clear DTC) zablokowany: brak jawnej autoryzacji chronionej akcji")
-            }
-        }
-
-        // 3. Prohibited Diagnostic Services (Write / Actuator / Security / Reset)
+        // 1. Dangerous State-Changing Services (Hard Blocked)
         if (clean.startsWith("11")) {
-            return CommandValidationResult.Blocked(rawCommand, "ZABLOKOWANO: Serwis 0x11 ECUReset")
+            return CommandValidationResult.Blocked(rawCommand, "ZABLOKOWANO: Serwis 0x11 ECUReset (modyfikacja stanu ECU)")
         }
         if (clean.startsWith("27")) {
-            return CommandValidationResult.Blocked(rawCommand, "ZABLOKOWANO: Serwis 0x27 SecurityAccess")
+            return CommandValidationResult.Blocked(rawCommand, "ZABLOKOWANO: Serwis 0x27 SecurityAccess (dostęp bezpieczeństwa)")
         }
         if (clean.startsWith("2E")) {
-            return CommandValidationResult.Blocked(rawCommand, "ZABLOKOWANO: Serwis 0x2E WriteDataByIdentifier")
+            return CommandValidationResult.Blocked(rawCommand, "ZABLOKOWANO: Serwis 0x2E WriteDataByIdentifier (zapis parametrów)")
         }
         if (clean.startsWith("2F") || clean.startsWith("30")) {
-            return CommandValidationResult.Blocked(rawCommand, "ZABLOKOWANO: Serwis 0x2F/0x30 ActuatorTest / IOControl")
+            return CommandValidationResult.Blocked(rawCommand, "ZABLOKOWANO: Serwis 0x2F/0x30 InputOutputControlByIdentifier (test elementów wykonawczych)")
         }
         if (clean.startsWith("31")) {
-            return CommandValidationResult.Blocked(rawCommand, "ZABLOKOWANO: Serwis 0x31 RoutineControl")
+            return CommandValidationResult.Blocked(rawCommand, "ZABLOKOWANO: Serwis 0x31 RoutineControl (uruchomienie procedury serwisowej)")
         }
         if (clean.startsWith("34") || clean.startsWith("36") || clean.startsWith("37")) {
-            return CommandValidationResult.Blocked(rawCommand, "ZABLOKOWANO: Serwis 0x34/0x36/0x37 Flash / TransferData")
+            return CommandValidationResult.Blocked(rawCommand, "ZABLOKOWANO: Serwis 0x34/0x36/0x37 Flash / TransferData (programowanie ECU)")
         }
         if (clean.startsWith("3D")) {
-            return CommandValidationResult.Blocked(rawCommand, "ZABLOKOWANO: Serwis 0x3D WriteMemoryByAddress")
+            return CommandValidationResult.Blocked(rawCommand, "ZABLOKOWANO: Serwis 0x3D WriteMemoryByAddress (zapis pamięci)")
         }
 
-        // 4. Standard OBD-II Mode 01 (Live Telemetry Read)
-        if (clean.startsWith("01")) {
-            if (clean.length == 4 && clean.all { it.isDigit() || it in 'A'..'F' }) {
-                return CommandValidationResult.Allowed(clean, "OBD2_MODE01_LIVE_TELEMETRY")
-            }
-            return CommandValidationResult.Blocked(rawCommand, "Nieprawidłowy format PID dla Mode 01 (oczekiwano 4 znaków hex)")
-        }
-
-        // 5. Standard OBD-II Mode 02 (Freeze Frame Read)
-        if (clean.startsWith("02")) {
-            if (clean.length in 4..6 && clean.all { it.isDigit() || it in 'A'..'F' }) {
-                return CommandValidationResult.Allowed(clean, "OBD2_MODE02_FREEZE_FRAME")
-            }
-            return CommandValidationResult.Blocked(rawCommand, "Nieprawidłowy format PID dla Mode 02")
-        }
-
-        // 6. Standard OBD-II Mode 03 (Stored DTC Read)
-        if (clean == "03") {
-            return CommandValidationResult.Allowed(clean, "OBD2_MODE03_STORED_DTC")
-        }
-
-        // 7. Standard OBD-II Mode 07 (Pending DTC Read)
-        if (clean == "07") {
-            return CommandValidationResult.Allowed(clean, "OBD2_MODE07_PENDING_DTC")
-        }
-
-        // 8. Standard OBD-II Mode 09 (Vehicle Info / Calibration Read)
-        if (clean.startsWith("09")) {
-            if (clean.length == 4 && clean.all { it.isDigit() || it in 'A'..'F' }) {
-                return CommandValidationResult.Allowed(clean, "OBD2_MODE09_VEHICLE_INFO")
-            }
-            return CommandValidationResult.Blocked(rawCommand, "Nieprawidłowy format PID dla Mode 09")
-        }
-
-        // 9. Renault UDS Service 0x19 (Read DTC Information)
-        if (clean.startsWith("19")) {
-            if (clean == "1902FF" || clean == "190200" || clean == "1902") {
-                return CommandValidationResult.Allowed(clean, "RENAULT_UDS_0x19_DTC_REPORT")
-            }
-            return CommandValidationResult.Blocked(rawCommand, "Nieobsługiwana sub-funkcja dla UDS 0x19")
-        }
-
-        // 10. Renault UDS Service 0x22 (ReadDataByIdentifier)
-        if (clean.startsWith("22")) {
-            val did = clean.removePrefix("22")
-            if (ALLOWED_UDS_READ_DIDS.contains(did)) {
-                return CommandValidationResult.Allowed(clean, "RENAULT_UDS_0x22_READ_DID")
-            }
+        // 2. Mode 04 (Clear DTC) - State modifying command, unconditionally blocked under READ_ONLY policy
+        if (clean == "04") {
             return CommandValidationResult.Blocked(
                 rawCommand,
-                "DID $did nie znajduje się na białej liście zweryfikowanych odczytów SID307"
+                "Mode 04 (Clear DTC) jest zablokowany: polityka READ_ONLY zabrania modyfikacji stanu diagnostycznego ECU"
             )
         }
 
-        return CommandValidationResult.Blocked(rawCommand, "Nieznana lub nieautoryzowana komenda diagnostyczna")
+        // 3. Proprietary Renault / SID307 UDS & CAN addressing - BLOCKED PENDING SOURCE VERIFICATION
+        if (clean.startsWith("ATSH") || clean.startsWith("ATCRA") || clean == "ATSP6") {
+            return CommandValidationResult.Blocked(
+                rawCommand,
+                "BLOCKED_PENDING_SOURCE_VERIFICATION: Adresowanie magistrali i protokoły Renault zablokowane do czasu CP2"
+            )
+        }
+        if (clean.startsWith("19")) {
+            return CommandValidationResult.Blocked(
+                rawCommand,
+                "BLOCKED_PENDING_SOURCE_VERIFICATION: Serwis 0x19 UDS ReadDTCInformation zablokowany do czasu weryfikacji bazy w CP2"
+            )
+        }
+        if (clean.startsWith("22")) {
+            return CommandValidationResult.Blocked(
+                rawCommand,
+                "BLOCKED_PENDING_SOURCE_VERIFICATION: Serwis 0x22 UDS ReadDataByIdentifier zablokowany do czasu weryfikacji bazy w CP2"
+            )
+        }
+
+        // 4. AT Commands (Minimal production allowlist: exact match only)
+        if (clean.startsWith("AT")) {
+            return if (ALLOWED_AT_COMMANDS.contains(clean)) {
+                CommandValidationResult.Allowed(clean, "ELM327_AT_INIT")
+            } else {
+                CommandValidationResult.Blocked(
+                    rawCommand,
+                    "Komenda AT '$clean' nie znajduje się na minimalnej liście produkcyjnej (Least Privilege)"
+                )
+            }
+        }
+
+        // 5. Standard OBD-II Mode 01 Live Telemetry (Minimal production allowlist)
+        if (clean.startsWith("01")) {
+            return if (ALLOWED_MODE01_PIDS.contains(clean)) {
+                CommandValidationResult.Allowed(clean, "OBD2_MODE01_LIVE_TELEMETRY")
+            } else {
+                CommandValidationResult.Blocked(
+                    rawCommand,
+                    "PID '$clean' nie jest używany przez bieżący tor produkcyjny (Least Privilege)"
+                )
+            }
+        }
+
+        // 6. Standard OBD-II DTC Read (Mode 03 / Mode 07)
+        if (ALLOWED_DTC_READ_COMMANDS.contains(clean)) {
+            val category = if (clean == "03") "OBD2_MODE03_STORED_DTC" else "OBD2_MODE07_PENDING_DTC"
+            return CommandValidationResult.Allowed(clean, category)
+        }
+
+        // 7. All other uncalled standard services (e.g. Mode 02, Mode 09) or unknown commands
+        return CommandValidationResult.Blocked(
+            rawCommand,
+            "Komenda '$clean' nie jest używana przez bieżący tor produkcyjny i pozostaje zablokowana (Least Privilege)"
+        )
     }
 }

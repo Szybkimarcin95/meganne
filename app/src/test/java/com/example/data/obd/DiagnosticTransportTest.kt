@@ -46,16 +46,16 @@ class DiagnosticTransportTest {
         transport.open()
         transport.mockResponses["010C"] = "41 0C 1A F8>"
         transport.mockResponses["010D"] = "41 0D 32>" // 50 km/h
-        transport.mockResponses["04"] = "44>"
+        transport.mockResponses["0105"] = "41 05 5A>"
 
         val rpmResp = transport.sendCommand("010C")
         val speedResp = transport.sendCommand("010D")
-        val clearResp = transport.sendCommand("04")
+        val coolantResp = transport.sendCommand("0105")
 
         assertEquals("41 0C 1A F8>", rpmResp)
         assertEquals("41 0D 32>", speedResp)
-        assertEquals("44>", clearResp)
-        assertEquals(listOf("010C", "010D", "04"), transport.sentCommands)
+        assertEquals("41 05 5A>", coolantResp)
+        assertEquals(listOf("010C", "010D", "0105"), transport.sentCommands)
     }
 
     @Test

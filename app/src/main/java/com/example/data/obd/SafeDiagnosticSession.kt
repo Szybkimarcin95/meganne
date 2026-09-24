@@ -27,6 +27,12 @@ sealed class DiagnosticExecutionResult {
         val message: String,
         val sessionGeneration: Long
     ) : DiagnosticExecutionResult()
+
+    data class AdapterError(
+        val errorType: String,
+        val message: String,
+        val sessionGeneration: Long
+    ) : DiagnosticExecutionResult()
 }
 
 /**
@@ -36,7 +42,8 @@ sealed class DiagnosticExecutionResult {
  * 1. Mutual exclusion: Exactly ONE diagnostic transaction in-flight at any time.
  * 2. Firewall protection: Disallowed commands are blocked before touching the transport.
  * 3. Session generation tracking: In-flight operations from dead/reconnected sessions are aborted.
- * 4. Response parsing: Handles fragmentation, timeouts, and adapter error codes (BUFFER FULL, NO DATA).
+ * 4. Response parsing: Handles fragmentation, timeouts, and adapter error codes (BUFFER FULL, NO DATA, etc.).
+ * 5. Clean resource release: Mutex is guaranteed released on timeout, error, or coroutine cancellation.
  */
 class SafeDiagnosticSession(
     private val transport: DiagnosticTransport
@@ -70,17 +77,16 @@ class SafeDiagnosticSession(
     }
 
     /**
-     * Executes a single diagnostic command through the safe pipeline.
+     * Executes a single diagnostic command through the safe read-only pipeline.
      */
     suspend fun executeCommand(
         rawCommand: String,
-        timeoutMs: Long = 1200L,
-        allowMode04Clear: Boolean = false
+        timeoutMs: Long = 1200L
     ): DiagnosticExecutionResult = withContext(Dispatchers.IO) {
         val expectedGeneration = currentGeneration.get()
 
-        // Step 1: Pre-execution Command Firewall validation
-        val validation = CommandFirewall.validate(rawCommand, allowMode04Clear)
+        // Step 1: Pre-execution Command Firewall validation (Transport is NEVER touched if blocked)
+        val validation = CommandFirewall.validate(rawCommand)
         if (validation is CommandValidationResult.Blocked) {
             return@withContext DiagnosticExecutionResult.BlockedByFirewall(
                 rawCommand = rawCommand,
@@ -89,7 +95,7 @@ class SafeDiagnosticSession(
         }
         val allowed = validation as CommandValidationResult.Allowed
 
-        // Step 2: Acquire transaction lock (Guarantees single transaction on bus)
+        // Step 2: Acquire transaction lock (Guarantees single transaction on bus, no interleaving)
         transactionMutex.withLock {
             // Check session validity after lock acquisition
             if (currentGeneration.get() != expectedGeneration) {
@@ -125,7 +131,7 @@ class SafeDiagnosticSession(
 
             val rttMs = System.currentTimeMillis() - startTime
 
-            // Step 3: Check session validity after command execution
+            // Step 3: Check session validity after command execution (Rejects stale result if session reset during await)
             if (currentGeneration.get() != expectedGeneration) {
                 return@withContext DiagnosticExecutionResult.TransportError(
                     errorType = "SESSION_EXPIRED",
@@ -140,23 +146,37 @@ class SafeDiagnosticSession(
 
             return@withContext when {
                 upper.contains("BUFFER FULL") -> {
-                    DiagnosticExecutionResult.TransportError(
+                    DiagnosticExecutionResult.AdapterError(
                         errorType = "BUFFER_FULL",
                         message = "Przepełnienie bufora ELM327",
                         sessionGeneration = currentGeneration.get()
                     )
                 }
                 upper.contains("CAN ERROR") -> {
-                    DiagnosticExecutionResult.TransportError(
+                    DiagnosticExecutionResult.AdapterError(
                         errorType = "CAN_ERROR",
                         message = "Błąd magistrali CAN",
                         sessionGeneration = currentGeneration.get()
                     )
                 }
                 upper.contains("UNABLE TO CONNECT") -> {
-                    DiagnosticExecutionResult.TransportError(
+                    DiagnosticExecutionResult.AdapterError(
                         errorType = "UNABLE_TO_CONNECT",
-                        message = "Brak połączenia z magistralą pojazdu",
+                        message = "Brak połączenia adaptera z magistralą pojazdu",
+                        sessionGeneration = currentGeneration.get()
+                    )
+                }
+                upper.contains("STOPPED") -> {
+                    DiagnosticExecutionResult.AdapterError(
+                        errorType = "STOPPED",
+                        message = "Operacja adaptera ELM327 zatrzymana (STOPPED)",
+                        sessionGeneration = currentGeneration.get()
+                    )
+                }
+                upper.contains("NO DATA") -> {
+                    DiagnosticExecutionResult.AdapterError(
+                        errorType = "NO_DATA",
+                        message = "Brak danych z ECU dla zapytania (NO DATA)",
                         sessionGeneration = currentGeneration.get()
                     )
                 }
@@ -164,6 +184,13 @@ class SafeDiagnosticSession(
                     DiagnosticExecutionResult.TransportError(
                         errorType = "TIMEOUT",
                         message = "Przekroczono limit czasu odpowiedzi ECU (${timeoutMs}ms)",
+                        sessionGeneration = currentGeneration.get()
+                    )
+                }
+                upper.contains("ERROR") -> {
+                    DiagnosticExecutionResult.AdapterError(
+                        errorType = "ERROR",
+                        message = "Błąd adaptera ELM327 (ERROR)",
                         sessionGeneration = currentGeneration.get()
                     )
                 }
