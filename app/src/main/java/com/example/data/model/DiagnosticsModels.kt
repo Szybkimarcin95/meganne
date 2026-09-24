@@ -76,31 +76,76 @@ data class RepairGuide(
     val verification: DataVerificationStatus = DataVerificationStatus.VERIFIED
 )
 
+enum class TelemetryAvailability {
+    AVAILABLE,
+    UNAVAILABLE
+}
+
+data class TelemetryField<T>(
+    val value: T? = null,
+    val source: DataVerificationStatus = DataVerificationStatus.UNVERIFIED,
+    val availability: TelemetryAvailability = TelemetryAvailability.UNAVAILABLE,
+    val timestamp: Long? = null,
+    val detail: String? = null
+) {
+    val isAvailable: Boolean
+        get() = availability == TelemetryAvailability.AVAILABLE && value != null
+
+    companion object {
+        fun <T> measured(value: T, timestamp: Long = System.currentTimeMillis()): TelemetryField<T> =
+            TelemetryField(
+                value = value,
+                source = DataVerificationStatus.MEASURED,
+                availability = TelemetryAvailability.AVAILABLE,
+                timestamp = timestamp
+            )
+
+        fun <T> simulated(value: T, timestamp: Long = System.currentTimeMillis()): TelemetryField<T> =
+            TelemetryField(
+                value = value,
+                source = DataVerificationStatus.SIMULATED,
+                availability = TelemetryAvailability.AVAILABLE,
+                timestamp = timestamp
+            )
+
+        fun <T> unavailable(
+            detail: String? = null,
+            timestamp: Long? = null
+        ): TelemetryField<T> =
+            TelemetryField(
+                value = null,
+                source = DataVerificationStatus.UNVERIFIED,
+                availability = TelemetryAvailability.UNAVAILABLE,
+                timestamp = timestamp,
+                detail = detail
+            )
+    }
+}
+
 data class LiveTelemetry(
-    val rpm: Int = 850,
-    val speedKmH: Int = 0,
-    val boostBar: Float = 0.02f,
-    val railPressureBar: Int = 280,
-    val coolantTempC: Int = 88,
-    val oilTempC: Int = 91,
-    val intakeAirTempC: Int = 24,
-    val mafAirFlowGps: Float = 12.5f,
-    val engineLoadPercent: Float = 18.0f,
-    val throttlePercent: Float = 0.0f,
-    val mapPressureKpa: Int = 101,
-    val dpfSootGrams: Float = 14.8f,
-    val oilDilutionPercent: Float = 3.2f,
-    val batteryVoltage: Float = 14.2f,
-    val fuelFlowLph: Float = 0.6f,
-    val egrPositionPercent: Float = 22.0f,
-    val injector1Correction: Float = -0.12f,
-    val injector2Correction: Float = 0.08f,
-    val injector3Correction: Float = -0.05f,
-    val injector4Correction: Float = 0.09f,
+    val rpm: TelemetryField<Int> = TelemetryField.unavailable(),
+    val speedKmH: TelemetryField<Int> = TelemetryField.unavailable(),
+    val boostBar: TelemetryField<Float> = TelemetryField.unavailable(),
+    val railPressureBar: TelemetryField<Int> = TelemetryField.unavailable(),
+    val coolantTempC: TelemetryField<Int> = TelemetryField.unavailable(),
+    val oilTempC: TelemetryField<Int> = TelemetryField.unavailable(),
+    val intakeAirTempC: TelemetryField<Int> = TelemetryField.unavailable(),
+    val mafAirFlowGps: TelemetryField<Float> = TelemetryField.unavailable(),
+    val engineLoadPercent: TelemetryField<Float> = TelemetryField.unavailable(),
+    val throttlePercent: TelemetryField<Float> = TelemetryField.unavailable(),
+    val mapPressureKpa: TelemetryField<Int> = TelemetryField.unavailable(),
+    val dpfSootGrams: TelemetryField<Float> = TelemetryField.unavailable(),
+    val oilDilutionPercent: TelemetryField<Float> = TelemetryField.unavailable(),
+    val batteryVoltage: TelemetryField<Float> = TelemetryField.unavailable(),
+    val fuelFlowLph: TelemetryField<Float> = TelemetryField.unavailable(),
+    val egrPositionPercent: TelemetryField<Float> = TelemetryField.unavailable(),
+    val injector1Correction: TelemetryField<Float> = TelemetryField.unavailable(),
+    val injector2Correction: TelemetryField<Float> = TelemetryField.unavailable(),
+    val injector3Correction: TelemetryField<Float> = TelemetryField.unavailable(),
+    val injector4Correction: TelemetryField<Float> = TelemetryField.unavailable(),
+    val isRegeneratingDpf: TelemetryField<Boolean> = TelemetryField.unavailable(),
     val isConnected: Boolean = false,
-    val isSimulated: Boolean = true,
-    val isRegeneratingDpf: Boolean = false,
-    val dataSource: DataVerificationStatus = DataVerificationStatus.SIMULATED
+    val isSimulated: Boolean = true
 )
 
 data class SensorTrendPoint(
@@ -159,5 +204,3 @@ data class DiagnosticCheckReport(
     val checks: List<HealthCheckItem>,
     val summaryRecommendation: String
 )
-
-

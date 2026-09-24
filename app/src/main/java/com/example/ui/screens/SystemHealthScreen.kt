@@ -423,7 +423,7 @@ fun SystemHealthScreen(
                 statusText = if (telemetry.isSimulated) "SIMULATED" else "NO LIVE SOURCE",
                 statusCode = if (telemetry.isSimulated) HealthStatusCode.INFO else HealthStatusCode.NOT_SCANNED,
                 source = if (telemetry.isSimulated) DiagnosticSourceType.SIMULATED else DiagnosticSourceType.UNAVAILABLE,
-                measuredValue = if (telemetry.isSimulated) "%.1f V (Syntetyczne w demo)".format(telemetry.batteryVoltage) else "Brak odczytu LIVE",
+                measuredValue = telemetry.batteryVoltage.value?.let { "%.1f V".format(it) } ?: "Brak potwierdzonego odczytu LIVE",
                 nominalCondition = "Wymaga dedykowanej komendy AT RV (brak w pętli Mode 01)",
                 detailMessage = "Napięcie zasilania nie jest obecnie fizycznie odpytywane z magistrali w trybie LIVE."
             )
@@ -444,12 +444,12 @@ fun SystemHealthScreen(
         item {
             HealthStateRow(
                 title = "Ochrona świeżości parametrów (Freshness protection)",
-                statusText = "PARTIAL",
-                statusCode = HealthStatusCode.WARNING,
+                statusText = "ACTIVE",
+                statusCode = HealthStatusCode.PASS,
                 source = DiagnosticSourceType.FILE,
-                measuredValue = "Brak per-parameter timestamps w LiveTelemetry",
+                measuredValue = "Per-parameter source + availability + timestamp",
                 nominalCondition = "Niezależny timestamp i flaga ważności dla każdego PID",
-                detailMessage = "Nie wszystkie pola LiveTelemetry mają jeszcze per-parameter freshness. W przypadku błędu parsowania ObdManager zachowuje poprzednią wartość."
+                detailMessage = "Brak poprawnej odpowiedzi w bieżącym pollingu oznacza UNAVAILABLE; poprzednia wartość nie jest prezentowana jako aktualny pomiar."
             )
         }
 

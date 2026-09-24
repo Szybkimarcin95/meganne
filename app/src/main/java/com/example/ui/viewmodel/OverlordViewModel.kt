@@ -155,20 +155,24 @@ internal fun buildDiagnosticCheckReport(
     )
 
     // Check 3: Napięcie instalacji elektrycznej
-    val voltage = telemetry.batteryVoltage
+    val voltage = telemetry.batteryVoltage.value
+    val rpm = telemetry.rpm.value
     val voltStatus = when {
+        voltage == null -> HealthCheckStatus.INFO
         voltage < 11.5f -> HealthCheckStatus.ALERT
-        voltage < 12.2f && telemetry.rpm == 0 -> HealthCheckStatus.WARNING
-        voltage in 12.2f..12.8f && telemetry.rpm == 0 -> HealthCheckStatus.PASS
+        rpm == 0 && voltage < 12.2f -> HealthCheckStatus.WARNING
+        rpm == 0 && voltage in 12.2f..12.8f -> HealthCheckStatus.PASS
         voltage in 13.5f..14.8f -> HealthCheckStatus.PASS
         voltage > 15.0f -> HealthCheckStatus.ALERT
-        else -> HealthCheckStatus.WARNING
+        else -> HealthCheckStatus.INFO
     }
     val voltMsg = when {
+        voltage == null -> "Brak potwierdzonego odczytu napięcia w tej sesji"
         voltage < 11.5f -> "Niski poziom naładowania akumulatora! Ryzyko problemów z rozruchem"
         voltage > 15.0f -> "Napięcie przeładowania regulatora alternatora!"
         voltage in 13.5f..14.8f -> "Prawidłowe napięcie ładowania alternatora"
-        else -> "Napięcie spoczynkowe akumulatora w akceptowalnym zakresie"
+        rpm == 0 && voltage in 12.2f..12.8f -> "Napięcie spoczynkowe akumulatora w akceptowalnym zakresie"
+        else -> "Odczyt napięcia wymaga interpretacji wraz ze stanem pracy silnika"
     }
     checks.add(
         HealthCheckItem(
@@ -176,24 +180,26 @@ internal fun buildDiagnosticCheckReport(
             name = "Zasilanie i alternator",
             subsystem = "Układ elektryczny",
             status = voltStatus,
-            measuredValue = "%.1f V".format(Locale.US, voltage),
+            measuredValue = voltage?.let { "%.1f V".format(Locale.US, it) } ?: "BRAK DANYCH",
             nominalRange = "12.4V - 12.8V (spoczynek) / 13.5V - 14.8V (ładowanie)",
             message = voltMsg
         )
     )
 
     // Check 4: Układ chłodzenia silnika
-    val coolant = telemetry.coolantTempC
+    val coolant = telemetry.coolantTempC.value
     val coolStatus = when {
+        coolant == null -> HealthCheckStatus.INFO
         coolant > 105 -> HealthCheckStatus.ALERT
         coolant > 98 -> HealthCheckStatus.WARNING
         coolant in 75..98 -> HealthCheckStatus.PASS
         else -> HealthCheckStatus.INFO
     }
     val coolMsg = when {
+        coolant == null -> "Brak potwierdzonego odczytu temperatury płynu w tej sesji"
         coolant > 105 -> "Temperatura płynu chłodzącego krytycznie wysoka! Ryzyko przegrzania"
         coolant in 75..98 -> "Prawidłowa temperatura robocza jednostki napędowej"
-        else -> "Silnik w fazie nagrzewania (poniżej temperatury roboczej 80°C)"
+        else -> "Silnik poza typowym zakresem temperatury roboczej — wymagana obserwacja"
     }
     checks.add(
         HealthCheckItem(
@@ -201,29 +207,38 @@ internal fun buildDiagnosticCheckReport(
             name = "Temperatura płynu chłodzącego",
             subsystem = "Układ chłodzenia",
             status = coolStatus,
-            measuredValue = "$coolant °C",
+            measuredValue = coolant?.let { it.toString() + " °C" } ?: "BRAK DANYCH",
             nominalRange = "80 °C - 95 °C",
             message = coolMsg
         )
     )
 
     // Check 5: Układ wtryskowy Common Rail
-    val corrections = listOf(
-        telemetry.injector1Correction,
-        telemetry.injector2Correction,
-        telemetry.injector3Correction,
-        telemetry.injector4Correction
+    val corrections = listOfNotNull(
+        telemetry.injector1Correction.value,
+        telemetry.injector2Correction.value,
+        telemetry.injector3Correction.value,
+        telemetry.injector4Correction.value
     )
-    val maxCorr = corrections.maxOfOrNull { abs(it) } ?: 0f
+    val maxCorr = corrections.maxOfOrNull { abs(it) }
+    val railPressure = telemetry.railPressureBar.value
     val injStatus = when {
-        maxCorr > 2.5f -> HealthCheckStatus.ALERT
-        maxCorr > 1.5f -> HealthCheckStatus.WARNING
+        corrections.size < 4 -> HealthCheckStatus.INFO
+        maxCorr != null && maxCorr > 2.5f -> HealthCheckStatus.ALERT
+        maxCorr != null && maxCorr > 1.5f -> HealthCheckStatus.WARNING
         else -> HealthCheckStatus.PASS
     }
     val injMsg = when {
-        maxCorr > 2.5f -> "Znaczna odchyłka dawki wtryskiwacza (> 2.5 mg/cp)! Wskazana weryfikacja przelewowa"
-        maxCorr > 1.5f -> "Podwyższona korekta wtryskiwacza (> 1.5 mg/cp). Wymagana obserwacja"
-        else -> "Wszystkie korekty dawek wtryskiwaczy cylindrów 1-4 w normie fabrycznej"
+        corrections.size < 4 -> "Brak kompletu potwierdzonych korekt wtryskiwaczy w tej sesji"
+        maxCorr != null && maxCorr > 2.5f -> "Znaczna odchyłka dawki wtryskiwacza (> 2.5 mg/cp)! Wskazana weryfikacja przelewowa"
+        maxCorr != null && maxCorr > 1.5f -> "Podwyższona korekta wtryskiwacza (> 1.5 mg/cp). Wymagana obserwacja"
+        else -> "Wszystkie dostępne korekty dawek wtryskiwaczy cylindrów 1-4 mieszczą się w przyjętym zakresie"
+    }
+    val injectionMeasured = if (maxCorr == null) {
+        "BRAK DANYCH"
+    } else {
+        val railText = railPressure?.let { it.toString() + " bar" } ?: "BRAK DANYCH"
+        "Max corr: %.2f mg/cp (Rail: %s)".format(Locale.US, maxCorr, railText)
     }
     checks.add(
         HealthCheckItem(
@@ -231,25 +246,28 @@ internal fun buildDiagnosticCheckReport(
             name = "Wtryskiwacze i Common Rail",
             subsystem = "Układ paliwowy K9K",
             status = injStatus,
-            measuredValue = "Max corr: ${"%.2f".format(Locale.US, maxCorr)} mg/cp (Rail: ${telemetry.railPressureBar} bar)",
+            measuredValue = injectionMeasured,
             nominalRange = "Odchyłka ± 1.0 mg/cp",
             message = injMsg
         )
     )
 
     // Check 6: Filtr cząstek stałych (DPF / FAP)
-    val soot = telemetry.dpfSootGrams
+    val soot = telemetry.dpfSootGrams.value
+    val isRegenerating = telemetry.isRegeneratingDpf.value
     val dpfStatus = when {
+        soot == null -> HealthCheckStatus.INFO
         soot > 35f -> HealthCheckStatus.ALERT
         soot > 25f -> HealthCheckStatus.WARNING
-        telemetry.isRegeneratingDpf -> HealthCheckStatus.INFO
+        isRegenerating == true -> HealthCheckStatus.INFO
         else -> HealthCheckStatus.PASS
     }
     val dpfMsg = when {
-        soot > 35f -> "Krytyczne nagromadzenie sadzy w DPF (> 35g)! Konieczna natychmiastowa procedura dopalenia"
-        soot > 25f -> "Podwyższona masa sadzy. Zalecana jazda pozamiejska w celu samoczynnej regeneracji"
-        telemetry.isRegeneratingDpf -> "Trwa aktywna regeneracja termiczna filtra cząstek stałych"
-        else -> "Poziom zapełnienia filtra DPF sadzą w bezpiecznym zakresie"
+        soot == null -> "Brak potwierdzonego odczytu masy sadzy DPF w tej sesji"
+        soot > 35f -> "Krytyczne nagromadzenie sadzy w DPF (> 35g)! Konieczna weryfikacja serwisowa"
+        soot > 25f -> "Podwyższona masa sadzy. Wymagana dalsza obserwacja parametrów regeneracji"
+        isRegenerating == true -> "Trwa aktywna regeneracja termiczna filtra cząstek stałych"
+        else -> "Odczyt masy sadzy nie wskazuje przekroczenia przyjętych progów"
     }
     checks.add(
         HealthCheckItem(
@@ -257,23 +275,27 @@ internal fun buildDiagnosticCheckReport(
             name = "Filtr cząstek stałych (DPF)",
             subsystem = "Oczyszczanie spalin",
             status = dpfStatus,
-            measuredValue = "${"%.1f".format(Locale.US, soot)} g sadzy",
+            measuredValue = soot?.let { "%.1f g sadzy".format(Locale.US, it) } ?: "BRAK DANYCH",
             nominalRange = "< 20.0 g (dopuszczalne < 30.0 g)",
             message = dpfMsg
         )
     )
 
     // Check 7: Ciśnienie doładowania & dolot (MAP)
-    val mapKpa = telemetry.mapPressureKpa
-    val boostBar = telemetry.boostBar
+    val mapKpa = telemetry.mapPressureKpa.value
+    val boostBar = telemetry.boostBar.value
     val boostStatus = when {
-        boostBar > 1.8f -> HealthCheckStatus.ALERT
+        mapKpa == null -> HealthCheckStatus.INFO
+        boostBar != null && boostBar > 1.8f -> HealthCheckStatus.ALERT
+        boostBar == null -> HealthCheckStatus.INFO
         mapKpa in 90..260 -> HealthCheckStatus.PASS
         else -> HealthCheckStatus.WARNING
     }
     val boostMsg = when {
+        mapKpa == null -> "Brak potwierdzonego odczytu MAP w tej sesji"
+        boostBar == null -> "MAP dostępny, ale brak potwierdzonego źródła ciśnienia doładowania"
         boostBar > 1.8f -> "Wysokie ciśnienie doładowania turbosprężarki!"
-        else -> "Parametry ciśnienia doładowania i czujnika MAP w normie roboczej"
+        else -> "Dostępne parametry MAP / Boost mieszczą się w przyjętym zakresie"
     }
     checks.add(
         HealthCheckItem(
@@ -281,7 +303,11 @@ internal fun buildDiagnosticCheckReport(
             name = "Układ doładowania (MAP / Turbo)",
             subsystem = "Układ dolotowy",
             status = boostStatus,
-            measuredValue = "${"%.2f".format(Locale.US, boostBar)} bar (${mapKpa} kPa)",
+            measuredValue = when {
+                mapKpa == null -> "BRAK DANYCH"
+                boostBar == null -> "MAP: " + mapKpa + " kPa / Boost: BRAK DANYCH"
+                else -> "%.2f bar (%d kPa)".format(Locale.US, boostBar, mapKpa)
+            },
             nominalRange = "0.0 - 1.5 bar (w zależności od obciążenia)",
             message = boostMsg
         )
@@ -291,8 +317,8 @@ internal fun buildDiagnosticCheckReport(
     val overall = when {
         checks.any { it.status == HealthCheckStatus.ALERT } -> HealthCheckStatus.ALERT
         checks.any { it.status == HealthCheckStatus.WARNING } -> HealthCheckStatus.WARNING
-        checks.any { it.status == HealthCheckStatus.PASS } -> HealthCheckStatus.PASS
-        else -> HealthCheckStatus.INFO
+        checks.any { it.status == HealthCheckStatus.INFO } -> HealthCheckStatus.INFO
+        else -> HealthCheckStatus.PASS
     }
 
     val recommendation = when (overall) {
@@ -580,7 +606,8 @@ class OverlordViewModel(application: Application) : AndroidViewModel(application
                 _dtcScanState.value = DtcScanState.NOT_RUN
                 _clearDtcSuccess.value = "Polecenie kasowania kodów DTC zostało wykonane. Wykonaj ponowny skan, aby sprawdzić aktualny stan usterek."
             } else {
-                _clearDtcSuccess.value = "Nie udało się skasować kodów błędów. Upewnij się, że zapłon jest włączony, a silnik zgaszony."
+                _clearDtcSuccess.value =
+                    "Kasowanie DTC jest wyłączone w bezpiecznym trybie READ-ONLY."
             }
         }
     }
@@ -627,20 +654,21 @@ class OverlordViewModel(application: Application) : AndroidViewModel(application
 
     fun logCurrentSensorSample(sensorId: String) {
         val t = telemetry.value
-        val (value, unit) = when (sensorId) {
-            "turbocharger" -> Pair(t.boostBar, "bar")
-            "map_sensor" -> Pair(t.mapPressureKpa.toFloat(), "kPa")
-            "hp_fuel_pump" -> Pair(t.railPressureBar.toFloat(), "bar")
-            "piezo_injectors" -> Pair(t.injector1Correction, "mg/skok")
-            "egr_valve" -> Pair(t.egrPositionPercent, "%")
-            else -> return
-        }
+        val sample = when (sensorId) {
+            "turbocharger" -> t.boostBar.value?.let { Triple(it, "bar", t.boostBar.source) }
+            "map_sensor" -> t.mapPressureKpa.value?.let { Triple(it.toFloat(), "kPa", t.mapPressureKpa.source) }
+            "hp_fuel_pump" -> t.railPressureBar.value?.let { Triple(it.toFloat(), "bar", t.railPressureBar.source) }
+            "piezo_injectors" -> t.injector1Correction.value?.let { Triple(it, "mg/skok", t.injector1Correction.source) }
+            "egr_valve" -> t.egrPositionPercent.value?.let { Triple(it, "%", t.egrPositionPercent.source) }
+            else -> null
+        } ?: return
+
         viewModelScope.launch {
             repository.logSensorTrend(
                 sensorId = sensorId,
-                value = value,
-                unit = unit,
-                status = t.dataSource
+                value = sample.first,
+                unit = sample.second,
+                status = sample.third
             )
         }
     }
@@ -763,7 +791,7 @@ class OverlordViewModel(application: Application) : AndroidViewModel(application
         sb.appendLine("Kod silnika:        K9K 636 (110 KM, 260 Nm, FAP)")
         sb.appendLine("Sterownik ECU:      Continental/Siemens SID307")
         sb.appendLine("Tryb telemetryczny: ${if (t.isSimulated) "SYMULACJA (K9K 636)" else if (t.isConnected) "FIZYCZNY ADAPTER OBD-II" else "ROZŁĄCZONO"}")
-        sb.appendLine("Status weryfikacji: ${t.dataSource}")
+        sb.appendLine("Status weryfikacji: per-parametr (MEASURED / SIMULATED / UNAVAILABLE)")
         sb.appendLine()
 
         sb.appendLine("--- 1. PODSUMOWANIE STANU POJAZDU ---")

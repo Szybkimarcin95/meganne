@@ -5,7 +5,7 @@ import com.example.data.model.DtcCode
 import com.example.data.model.DtcSeverity
 import com.example.data.model.HealthCheckStatus
 import com.example.data.model.LiveTelemetry
-import com.example.data.obd.DataVerificationStatus
+import com.example.data.model.TelemetryField
 import com.example.data.obd.ObdConnectionState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -15,21 +15,20 @@ import org.junit.Test
 class DiagnosticCheckReportTest {
 
     private val nominalTelemetry = LiveTelemetry(
-        rpm = 850,
-        speedKmH = 0,
-        boostBar = 0.05f,
-        railPressureBar = 280,
-        coolantTempC = 88,
-        batteryVoltage = 14.2f,
-        dpfSootGrams = 12.0f,
-        injector1Correction = -0.1f,
-        injector2Correction = 0.1f,
-        injector3Correction = -0.05f,
-        injector4Correction = 0.05f,
-        mapPressureKpa = 101,
+        rpm = TelemetryField.measured(850),
+        speedKmH = TelemetryField.measured(0),
+        boostBar = TelemetryField.measured(0.05f),
+        railPressureBar = TelemetryField.measured(280),
+        coolantTempC = TelemetryField.measured(88),
+        batteryVoltage = TelemetryField.measured(14.2f),
+        dpfSootGrams = TelemetryField.measured(12.0f),
+        injector1Correction = TelemetryField.measured(-0.1f),
+        injector2Correction = TelemetryField.measured(0.1f),
+        injector3Correction = TelemetryField.measured(-0.05f),
+        injector4Correction = TelemetryField.measured(0.05f),
+        mapPressureKpa = TelemetryField.measured(101),
         isConnected = true,
-        isSimulated = false,
-        dataSource = DataVerificationStatus.MEASURED
+        isSimulated = false
     )
 
     @Test
@@ -91,7 +90,9 @@ class DiagnosticCheckReportTest {
 
     @Test
     fun withLowBattery_overallStatusBecomesAlert() {
-        val lowBattTelemetry = nominalTelemetry.copy(batteryVoltage = 11.2f)
+        val lowBattTelemetry = nominalTelemetry.copy(
+            batteryVoltage = TelemetryField.measured(11.2f)
+        )
 
         val report = buildDiagnosticCheckReport(
             telemetry = lowBattTelemetry,
@@ -109,7 +110,7 @@ class DiagnosticCheckReportTest {
 
     @Test
     fun withEngineOverheating_coolingStatusBecomesAlert() {
-        val hotTelemetry = nominalTelemetry.copy(coolantTempC = 112)
+        val hotTelemetry = nominalTelemetry.copy(coolantTempC = TelemetryField.measured(112))
 
         val report = buildDiagnosticCheckReport(
             telemetry = hotTelemetry,
@@ -127,7 +128,7 @@ class DiagnosticCheckReportTest {
 
     @Test
     fun withExcessiveInjectorCorrection_injectionStatusBecomesAlert() {
-        val badInjTelemetry = nominalTelemetry.copy(injector2Correction = 3.2f)
+        val badInjTelemetry = nominalTelemetry.copy(injector2Correction = TelemetryField.measured(3.2f))
 
         val report = buildDiagnosticCheckReport(
             telemetry = badInjTelemetry,
@@ -145,8 +146,8 @@ class DiagnosticCheckReportTest {
     @Test
     fun simulationModeReflectedInProvenance() {
         val simTelemetry = nominalTelemetry.copy(
-            isSimulated = true,
-            dataSource = DataVerificationStatus.SIMULATED
+            isConnected = true,
+            isSimulated = true
         )
 
         val report = buildDiagnosticCheckReport(

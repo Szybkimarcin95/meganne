@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.content.Context
 import com.example.data.model.LiveTelemetry
+import com.example.data.model.TelemetryField
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -83,10 +84,10 @@ class ObdManager(private val context: Context) {
         stopActiveJobs()
         _connectionState.value = ObdConnectionState.CONNECTED
         _connectionStatus.value = "Tryb Symulacji: K9K 636 Aktywny"
-        _telemetry.value = _telemetry.value.copy(
+        _livePidData.value = emptyMap()
+        _telemetry.value = LiveTelemetry(
             isConnected = true,
-            isSimulated = true,
-            dataSource = DataVerificationStatus.SIMULATED
+            isSimulated = true
         )
 
         telemetryJob = scope.launch {
@@ -112,31 +113,31 @@ class ObdManager(private val context: Context) {
                 val battery = (14.1f + (sin(step * 0.3) * 0.2).toFloat()).coerceIn(13.8f, 14.5f)
                 val egr = if (dynamicRpm > 2400) 0.0f else (24.0f + (sin(step) * 10).toFloat()).coerceIn(0f, 60f)
 
+                val sampleTimestamp = System.currentTimeMillis()
                 _telemetry.value = LiveTelemetry(
-                    rpm = dynamicRpm,
-                    speedKmH = speed,
-                    boostBar = ((boost * 100).toInt() / 100f),
-                    railPressureBar = railPressure,
-                    coolantTempC = coolant,
-                    oilTempC = oilTemp,
-                    intakeAirTempC = intakeTemp,
-                    mafAirFlowGps = ((maf * 10).toInt() / 10f),
-                    engineLoadPercent = ((loadPercent * 10).toInt() / 10f),
-                    throttlePercent = ((throttle * 10).toInt() / 10f),
-                    mapPressureKpa = mapKpa,
-                    dpfSootGrams = ((soot * 10).toInt() / 10f),
-                    oilDilutionPercent = 3.2f,
-                    batteryVoltage = ((battery * 10).toInt() / 10f),
-                    fuelFlowLph = ((fuelFlow * 10).toInt() / 10f),
-                    egrPositionPercent = ((egr * 10).toInt() / 10f),
-                    injector1Correction = -0.12f + (sin(step * 0.8) * 0.04f).toFloat(),
-                    injector2Correction = 0.08f + (sin(step * 0.9) * 0.03f).toFloat(),
-                    injector3Correction = -0.05f + (sin(step * 0.7) * 0.03f).toFloat(),
-                    injector4Correction = 0.09f + (sin(step * 1.1) * 0.04f).toFloat(),
+                    rpm = TelemetryField.simulated(dynamicRpm, sampleTimestamp),
+                    speedKmH = TelemetryField.simulated(speed, sampleTimestamp),
+                    boostBar = TelemetryField.simulated(((boost * 100).toInt() / 100f), sampleTimestamp),
+                    railPressureBar = TelemetryField.simulated(railPressure, sampleTimestamp),
+                    coolantTempC = TelemetryField.simulated(coolant, sampleTimestamp),
+                    oilTempC = TelemetryField.simulated(oilTemp, sampleTimestamp),
+                    intakeAirTempC = TelemetryField.simulated(intakeTemp, sampleTimestamp),
+                    mafAirFlowGps = TelemetryField.simulated(((maf * 10).toInt() / 10f), sampleTimestamp),
+                    engineLoadPercent = TelemetryField.simulated(((loadPercent * 10).toInt() / 10f), sampleTimestamp),
+                    throttlePercent = TelemetryField.simulated(((throttle * 10).toInt() / 10f), sampleTimestamp),
+                    mapPressureKpa = TelemetryField.simulated(mapKpa, sampleTimestamp),
+                    dpfSootGrams = TelemetryField.simulated(((soot * 10).toInt() / 10f), sampleTimestamp),
+                    oilDilutionPercent = TelemetryField.simulated(3.2f, sampleTimestamp),
+                    batteryVoltage = TelemetryField.simulated(((battery * 10).toInt() / 10f), sampleTimestamp),
+                    fuelFlowLph = TelemetryField.simulated(((fuelFlow * 10).toInt() / 10f), sampleTimestamp),
+                    egrPositionPercent = TelemetryField.simulated(((egr * 10).toInt() / 10f), sampleTimestamp),
+                    injector1Correction = TelemetryField.simulated(-0.12f + (sin(step * 0.8) * 0.04f).toFloat(), sampleTimestamp),
+                    injector2Correction = TelemetryField.simulated(0.08f + (sin(step * 0.9) * 0.03f).toFloat(), sampleTimestamp),
+                    injector3Correction = TelemetryField.simulated(-0.05f + (sin(step * 0.7) * 0.03f).toFloat(), sampleTimestamp),
+                    injector4Correction = TelemetryField.simulated(0.09f + (sin(step * 1.1) * 0.04f).toFloat(), sampleTimestamp),
+                    isRegeneratingDpf = TelemetryField.simulated(soot > 22.0f, sampleTimestamp),
                     isConnected = true,
-                    isSimulated = true,
-                    isRegeneratingDpf = (soot > 22.0f),
-                    dataSource = DataVerificationStatus.SIMULATED
+                    isSimulated = true
                 )
 
                 if (_isLogging.value) {
@@ -188,10 +189,10 @@ class ObdManager(private val context: Context) {
 
             _connectionState.value = ObdConnectionState.READING
             _connectionStatus.value = "Połączono fizycznie z ELM327. Odczyt OBD-II..."
-            _telemetry.value = _telemetry.value.copy(
+            _livePidData.value = emptyMap()
+            _telemetry.value = LiveTelemetry(
                 isConnected = true,
-                isSimulated = false,
-                dataSource = DataVerificationStatus.MEASURED
+                isSimulated = false
             )
 
             startLiveObdPolling(session)
@@ -256,31 +257,48 @@ class ObdManager(private val context: Context) {
                         consecutiveFailures = 0
                     }
 
-                    // Update live map
+                    // Keep the live PID cache aligned with the latest poll only.
                     val currentMap = _livePidData.value.toMutableMap()
-                    rpmResult?.let { currentMap["010C"] = it }
-                    speedResult?.let { currentMap["010D"] = it }
-                    coolantResult?.let { currentMap["0105"] = it }
-                    iatResult?.let { currentMap["010F"] = it }
-                    mafResult?.let { currentMap["0110"] = it }
-                    loadResult?.let { currentMap["0104"] = it }
-                    throttleResult?.let { currentMap["0111"] = it }
-                    mapResult?.let { currentMap["010B"] = it }
+                    if (rpmResult != null) currentMap["010C"] = rpmResult else currentMap.remove("010C")
+                    if (speedResult != null) currentMap["010D"] = speedResult else currentMap.remove("010D")
+                    if (coolantResult != null) currentMap["0105"] = coolantResult else currentMap.remove("0105")
+                    if (iatResult != null) currentMap["010F"] = iatResult else currentMap.remove("010F")
+                    if (mafResult != null) currentMap["0110"] = mafResult else currentMap.remove("0110")
+                    if (loadResult != null) currentMap["0104"] = loadResult else currentMap.remove("0104")
+                    if (throttleResult != null) currentMap["0111"] = throttleResult else currentMap.remove("0111")
+                    if (mapResult != null) currentMap["010B"] = mapResult else currentMap.remove("010B")
                     _livePidData.value = currentMap
 
-                    // Update Telemetry model
+                    // Every signal carries its own provenance. A failed current poll
+                    // becomes UNAVAILABLE instead of retaining a stale measured value.
+                    val pollTimestamp = System.currentTimeMillis()
                     _telemetry.value = _telemetry.value.copy(
-                        rpm = rpmResult?.value?.toInt() ?: _telemetry.value.rpm,
-                        speedKmH = speedResult?.value?.toInt() ?: _telemetry.value.speedKmH,
-                        coolantTempC = coolantResult?.value?.toInt() ?: _telemetry.value.coolantTempC,
-                        intakeAirTempC = iatResult?.value?.toInt() ?: _telemetry.value.intakeAirTempC,
-                        mafAirFlowGps = mafResult?.value?.toFloat() ?: _telemetry.value.mafAirFlowGps,
-                        engineLoadPercent = loadResult?.value?.toFloat() ?: _telemetry.value.engineLoadPercent,
-                        throttlePercent = throttleResult?.value?.toFloat() ?: _telemetry.value.throttlePercent,
-                        mapPressureKpa = mapResult?.value?.toInt() ?: _telemetry.value.mapPressureKpa,
+                        rpm = rpmResult?.let {
+                            TelemetryField.measured(it.value.toInt(), it.timestamp)
+                        } ?: TelemetryField.unavailable("LATEST_POLL_NO_VALID_VALUE", pollTimestamp),
+                        speedKmH = speedResult?.let {
+                            TelemetryField.measured(it.value.toInt(), it.timestamp)
+                        } ?: TelemetryField.unavailable("LATEST_POLL_NO_VALID_VALUE", pollTimestamp),
+                        coolantTempC = coolantResult?.let {
+                            TelemetryField.measured(it.value.toInt(), it.timestamp)
+                        } ?: TelemetryField.unavailable("LATEST_POLL_NO_VALID_VALUE", pollTimestamp),
+                        intakeAirTempC = iatResult?.let {
+                            TelemetryField.measured(it.value.toInt(), it.timestamp)
+                        } ?: TelemetryField.unavailable("LATEST_POLL_NO_VALID_VALUE", pollTimestamp),
+                        mafAirFlowGps = mafResult?.let {
+                            TelemetryField.measured(it.value.toFloat(), it.timestamp)
+                        } ?: TelemetryField.unavailable("LATEST_POLL_NO_VALID_VALUE", pollTimestamp),
+                        engineLoadPercent = loadResult?.let {
+                            TelemetryField.measured(it.value.toFloat(), it.timestamp)
+                        } ?: TelemetryField.unavailable("LATEST_POLL_NO_VALID_VALUE", pollTimestamp),
+                        throttlePercent = throttleResult?.let {
+                            TelemetryField.measured(it.value.toFloat(), it.timestamp)
+                        } ?: TelemetryField.unavailable("LATEST_POLL_NO_VALID_VALUE", pollTimestamp),
+                        mapPressureKpa = mapResult?.let {
+                            TelemetryField.measured(it.value.toInt(), it.timestamp)
+                        } ?: TelemetryField.unavailable("LATEST_POLL_NO_VALID_VALUE", pollTimestamp),
                         isConnected = true,
-                        isSimulated = false,
-                        dataSource = DataVerificationStatus.MEASURED
+                        isSimulated = false
                     )
 
                     // Forward to logger if enabled
@@ -389,19 +407,20 @@ class ObdManager(private val context: Context) {
         _connectionState.value = ObdConnectionState.DISCONNECTED
         _activeTroubleCodes.value = emptyList()
         _pendingTroubleCodes.value = emptyList()
-        _telemetry.value = _telemetry.value.copy(
+        _livePidData.value = emptyMap()
+        _telemetry.value = LiveTelemetry(
             isConnected = false,
-            isSimulated = false,
-            dataSource = DataVerificationStatus.UNVERIFIED
+            isSimulated = false
         )
         _connectionStatus.value = "Rozłączono"
     }
 
     internal fun setSimulationMode(enabled: Boolean) {
         stopActiveJobs()
-        _telemetry.value = _telemetry.value.copy(
-            isSimulated = enabled,
-            dataSource = if (enabled) DataVerificationStatus.SIMULATED else DataVerificationStatus.UNVERIFIED
+        _livePidData.value = emptyMap()
+        _telemetry.value = LiveTelemetry(
+            isConnected = enabled,
+            isSimulated = enabled
         )
     }
 }

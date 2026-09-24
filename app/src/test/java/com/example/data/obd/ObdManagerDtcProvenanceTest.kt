@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -40,6 +41,26 @@ class ObdManagerDtcProvenanceTest {
         assertTrue("Pending DTCs must be empty when disconnected", pending.isEmpty())
         assertTrue("Active DTC state must be empty", manager.activeTroubleCodes.value.isEmpty())
         assertTrue("Pending DTC state must be empty", manager.pendingTroubleCodes.value.isEmpty())
+        assertFalse("Disconnected telemetry must not stay in simulation mode", manager.telemetry.value.isSimulated)
+        assertFalse("Disconnected RPM must be unavailable", manager.telemetry.value.rpm.isAvailable)
+        assertFalse("Disconnected DPF soot must be unavailable", manager.telemetry.value.dpfSootGrams.isAvailable)
+        assertTrue("Disconnected live PID cache must be empty", manager.livePidData.value.isEmpty())
+    }
+
+    @Test
+    fun testMode04IsBlockedBeforeTransport() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val manager = ObdManager(context)
+        manager.disconnect()
+
+        val mockTransport = MockDiagnosticTransport()
+        mockTransport.open()
+        manager.transport = mockTransport
+
+        val cleared = manager.clearTroubleCodes()
+
+        assertFalse(cleared)
+        assertTrue(mockTransport.sentCommands.none { it == "04" })
     }
 
     @Test

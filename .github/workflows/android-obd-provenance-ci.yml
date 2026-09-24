@@ -1,0 +1,63 @@
+name: Android OBD Provenance CI
+
+on:
+  push:
+    branches:
+      - ci/obd-provenance-20260924
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-obd-provenance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Compile and unit test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses >/dev/null || true
+
+      - name: Install Android 16 QPR2 SDK
+        run: sdkmanager "platforms;android-36.1" "build-tools;36.0.0"
+
+      - name: Set up Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.3.1"
+
+      - name: Validate Gradle project
+        run: gradle projects --stacktrace
+
+      - name: Compile debug Kotlin
+        run: gradle :app:compileDebugKotlin --stacktrace
+
+      - name: Run debug unit tests
+        run: gradle :app:testDebugUnitTest --stacktrace
+
+      - name: Upload unit-test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: obd-provenance-test-reports
+          if-no-files-found: ignore
+          path: |
+            app/build/reports/tests/
+            app/build/test-results/

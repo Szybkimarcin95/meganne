@@ -56,7 +56,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.DtcScanState
+import com.example.data.model.TelemetryField
 import com.example.data.model.VehicleSpec
+import com.example.data.obd.DataVerificationStatus
 import com.example.data.obd.ObdConnectionState
 import com.example.ui.components.CompactActionBar
 import com.example.ui.components.DiagnosticSectionHeader
@@ -277,6 +279,20 @@ private fun ScannerModuleContent(
     }
 }
 
+private fun <T> telemetrySource(field: TelemetryField<T>): DiagnosticSourceType = when {
+    !field.isAvailable -> DiagnosticSourceType.UNAVAILABLE
+    field.source == DataVerificationStatus.MEASURED -> DiagnosticSourceType.LIVE
+    field.source == DataVerificationStatus.SIMULATED -> DiagnosticSourceType.SIMULATED
+    else -> DiagnosticSourceType.UNKNOWN
+}
+
+private fun <T> telemetryFreshness(field: TelemetryField<T>): String = when {
+    !field.isAvailable -> field.detail ?: "BRAK ODCZYTU"
+    field.source == DataVerificationStatus.MEASURED -> "BIEŻĄCY ODCZYT"
+    field.source == DataVerificationStatus.SIMULATED -> "SYMULACJA 4Hz"
+    else -> "NIEZWERYFIKOWANE"
+}
+
 /**
  * Compact Live Data table view adhering strictly to:
  * PARAMETER | VALUE | UNIT | SOURCE | FRESHNESS
@@ -289,17 +305,6 @@ private fun ScannerLiveDataView(viewModel: OverlordViewModel) {
     val isSimulated = telemetry.isSimulated
 
     var selectedGroup by remember { mutableStateOf("WSZYSTKIE") }
-
-    val source = when {
-        isSimulated -> DiagnosticSourceType.SIMULATED
-        isConnected -> DiagnosticSourceType.LIVE
-        else -> DiagnosticSourceType.UNKNOWN
-    }
-    val freshness = when {
-        isConnected -> "Świeże (CAN)"
-        isSimulated -> "Symulacja 4Hz"
-        else -> "Brak odczytu"
-    }
 
     LazyColumn(
         modifier = Modifier
@@ -362,10 +367,10 @@ private fun ScannerLiveDataView(viewModel: OverlordViewModel) {
             ParameterRow(
                 parameterName = "Prędkość obrotowa silnika (RPM)",
                 pidHex = "010C",
-                valueString = if (isConnected || isSimulated) telemetry.rpm.toString() else "—",
+                valueString = telemetry.rpm.value?.toString() ?: "—",
                 unit = "obr/min",
-                source = source,
-                freshness = freshness
+                source = telemetrySource(telemetry.rpm),
+                freshness = telemetryFreshness(telemetry.rpm)
             )
         }
 
@@ -373,10 +378,10 @@ private fun ScannerLiveDataView(viewModel: OverlordViewModel) {
             ParameterRow(
                 parameterName = "Prędkość pojazdu",
                 pidHex = "010D",
-                valueString = if (isConnected || isSimulated) telemetry.speedKmH.toString() else "—",
+                valueString = telemetry.speedKmH.value?.toString() ?: "—",
                 unit = "km/h",
-                source = source,
-                freshness = freshness
+                source = telemetrySource(telemetry.speedKmH),
+                freshness = telemetryFreshness(telemetry.speedKmH)
             )
         }
 
@@ -384,10 +389,10 @@ private fun ScannerLiveDataView(viewModel: OverlordViewModel) {
             ParameterRow(
                 parameterName = "Temperatura płynu chłodzącego (ECT)",
                 pidHex = "0105",
-                valueString = if (isConnected || isSimulated) telemetry.coolantTempC.toString() else "—",
+                valueString = telemetry.coolantTempC.value?.toString() ?: "—",
                 unit = "°C",
-                source = source,
-                freshness = freshness
+                source = telemetrySource(telemetry.coolantTempC),
+                freshness = telemetryFreshness(telemetry.coolantTempC)
             )
         }
 
@@ -395,10 +400,10 @@ private fun ScannerLiveDataView(viewModel: OverlordViewModel) {
             ParameterRow(
                 parameterName = "Temperatura powietrza dolotowego (IAT)",
                 pidHex = "010F",
-                valueString = if (isConnected || isSimulated) telemetry.intakeAirTempC.toString() else "—",
+                valueString = telemetry.intakeAirTempC.value?.toString() ?: "—",
                 unit = "°C",
-                source = source,
-                freshness = freshness
+                source = telemetrySource(telemetry.intakeAirTempC),
+                freshness = telemetryFreshness(telemetry.intakeAirTempC)
             )
         }
 
@@ -406,10 +411,10 @@ private fun ScannerLiveDataView(viewModel: OverlordViewModel) {
             ParameterRow(
                 parameterName = "Przepływomierz masowy powietrza (MAF)",
                 pidHex = "0110",
-                valueString = if (isConnected || isSimulated) "%.2f".format(telemetry.mafAirFlowGps) else "—",
+                valueString = telemetry.mafAirFlowGps.value?.let { "%.2f".format(it) } ?: "—",
                 unit = "g/s",
-                source = source,
-                freshness = freshness
+                source = telemetrySource(telemetry.mafAirFlowGps),
+                freshness = telemetryFreshness(telemetry.mafAirFlowGps)
             )
         }
 
@@ -417,10 +422,10 @@ private fun ScannerLiveDataView(viewModel: OverlordViewModel) {
             ParameterRow(
                 parameterName = "Wyliczone obciążenie silnika (Load)",
                 pidHex = "0104",
-                valueString = if (isConnected || isSimulated) "%.1f".format(telemetry.engineLoadPercent) else "—",
+                valueString = telemetry.engineLoadPercent.value?.let { "%.1f".format(it) } ?: "—",
                 unit = "%",
-                source = source,
-                freshness = freshness
+                source = telemetrySource(telemetry.engineLoadPercent),
+                freshness = telemetryFreshness(telemetry.engineLoadPercent)
             )
         }
 
@@ -428,10 +433,10 @@ private fun ScannerLiveDataView(viewModel: OverlordViewModel) {
             ParameterRow(
                 parameterName = "Względne położenie przepustnicy (TP)",
                 pidHex = "0111",
-                valueString = if (isConnected || isSimulated) "%.1f".format(telemetry.throttlePercent) else "—",
+                valueString = telemetry.throttlePercent.value?.let { "%.1f".format(it) } ?: "—",
                 unit = "%",
-                source = source,
-                freshness = freshness
+                source = telemetrySource(telemetry.throttlePercent),
+                freshness = telemetryFreshness(telemetry.throttlePercent)
             )
         }
 
@@ -439,10 +444,10 @@ private fun ScannerLiveDataView(viewModel: OverlordViewModel) {
             ParameterRow(
                 parameterName = "Ciśnienie bezwzględne w kolektorze (MAP)",
                 pidHex = "010B",
-                valueString = if (isConnected || isSimulated) telemetry.mapPressureKpa.toString() else "—",
+                valueString = telemetry.mapPressureKpa.value?.toString() ?: "—",
                 unit = "kPa",
-                source = source,
-                freshness = freshness
+                source = telemetrySource(telemetry.mapPressureKpa),
+                freshness = telemetryFreshness(telemetry.mapPressureKpa)
             )
         }
 
@@ -450,10 +455,10 @@ private fun ScannerLiveDataView(viewModel: OverlordViewModel) {
             ParameterRow(
                 parameterName = "Napięcie zasilania adaptera / OBD",
                 pidHex = "PIN16",
-                valueString = if (isSimulated) "%.1f".format(telemetry.batteryVoltage) else "—",
-                unit = if (isSimulated) "V" else "—",
-                source = if (isSimulated) DiagnosticSourceType.SIMULATED else DiagnosticSourceType.UNAVAILABLE,
-                freshness = if (isSimulated) "Symulacja demo" else "NO LIVE SOURCE"
+                valueString = telemetry.batteryVoltage.value?.let { "%.1f".format(it) } ?: "—",
+                unit = if (telemetry.batteryVoltage.isAvailable) "V" else "—",
+                source = telemetrySource(telemetry.batteryVoltage),
+                freshness = telemetryFreshness(telemetry.batteryVoltage)
             )
         }
 
@@ -461,10 +466,10 @@ private fun ScannerLiveDataView(viewModel: OverlordViewModel) {
             ParameterRow(
                 parameterName = "Ciśnienie doładowania turbosprężarki (Boost)",
                 pidHex = "CALC",
-                valueString = if (isSimulated) "%.2f".format(telemetry.boostBar) else "—",
-                unit = if (isSimulated) "bar" else "—",
-                source = if (isSimulated) DiagnosticSourceType.SIMULATED else DiagnosticSourceType.UNAVAILABLE,
-                freshness = if (isSimulated) "Model demo" else "NO LIVE SOURCE"
+                valueString = telemetry.boostBar.value?.let { "%.2f".format(it) } ?: "—",
+                unit = if (telemetry.boostBar.isAvailable) "bar" else "—",
+                source = telemetrySource(telemetry.boostBar),
+                freshness = telemetryFreshness(telemetry.boostBar)
             )
         }
 
@@ -472,10 +477,10 @@ private fun ScannerLiveDataView(viewModel: OverlordViewModel) {
             ParameterRow(
                 parameterName = "Ciśnienie szyny Common Rail",
                 pidHex = "REF",
-                valueString = if (isSimulated) telemetry.railPressureBar.toString() else "—",
-                unit = if (isSimulated) "bar" else "—",
-                source = if (isSimulated) DiagnosticSourceType.SIMULATED else DiagnosticSourceType.UNAVAILABLE,
-                freshness = if (isSimulated) "Model demo" else "NO LIVE SOURCE / CP2"
+                valueString = telemetry.railPressureBar.value?.toString() ?: "—",
+                unit = if (telemetry.railPressureBar.isAvailable) "bar" else "—",
+                source = telemetrySource(telemetry.railPressureBar),
+                freshness = telemetryFreshness(telemetry.railPressureBar)
             )
         }
 
@@ -483,10 +488,10 @@ private fun ScannerLiveDataView(viewModel: OverlordViewModel) {
             ParameterRow(
                 parameterName = "Szacowana masa sadzy w filtrze DPF",
                 pidHex = "DPF",
-                valueString = if (isSimulated) "%.1f".format(telemetry.dpfSootGrams) else "—",
-                unit = if (isSimulated) "g" else "—",
-                source = if (isSimulated) DiagnosticSourceType.SIMULATED else DiagnosticSourceType.UNAVAILABLE,
-                freshness = if (isSimulated) "Model demo" else "NO LIVE SOURCE / CP2"
+                valueString = telemetry.dpfSootGrams.value?.let { "%.1f".format(it) } ?: "—",
+                unit = if (telemetry.dpfSootGrams.isAvailable) "g" else "—",
+                source = telemetrySource(telemetry.dpfSootGrams),
+                freshness = telemetryFreshness(telemetry.dpfSootGrams)
             )
         }
 

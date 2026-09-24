@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -68,7 +69,7 @@ import com.example.ui.theme.WarningRed
 
 @Composable
 fun CockpitGauge(
-    value: Float,
+    value: Float?,
     minValue: Float,
     maxValue: Float,
     title: String,
@@ -78,11 +79,15 @@ fun CockpitGauge(
     gaugeColor: Color = CyanHud,
     warningThreshold: Float? = null
 ) {
-    val progress = ((value - minValue) / (maxValue - minValue)).coerceIn(0f, 1f)
+    val progress = value?.let {
+        ((it - minValue) / (maxValue - minValue)).coerceIn(0f, 1f)
+    } ?: 0f
     val animatedProgress by animateFloatAsState(targetValue = progress, label = "gaugeProgress")
 
-    val activeColor = if (warningThreshold != null && value >= warningThreshold) {
+    val activeColor = if (value != null && warningThreshold != null && value >= warningThreshold) {
         WarningRed
+    } else if (value == null) {
+        TextMuted
     } else {
         gaugeColor
     }
@@ -140,12 +145,11 @@ fun CockpitGauge(
                 }
 
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    val formattedVal = if (value < 10 && value != value.toInt().toFloat()) {
-                        "%.2f".format(value)
-                    } else if (value < 100) {
-                        "%.1f".format(value)
-                    } else {
-                        value.toInt().toString()
+                    val formattedVal = when {
+                        value == null -> "BRAK"
+                        value < 10 && value != value.toInt().toFloat() -> "%.2f".format(value)
+                        value < 100 -> "%.1f".format(value)
+                        else -> value.toInt().toString()
                     }
 
                     Text(
@@ -157,7 +161,7 @@ fun CockpitGauge(
                         )
                     )
                     Text(
-                        text = unit,
+                        text = if (value == null) "DANYCH" else unit,
                         style = MaterialTheme.typography.labelSmall.copy(color = TextMuted)
                     )
                 }
@@ -305,7 +309,7 @@ fun VehicleHeaderCard(
 fun SystemHealthCard(
     title: String,
     status: String,
-    isHealthy: Boolean,
+    isHealthy: Boolean?,
     detail: String,
     modifier: Modifier = Modifier
 ) {
@@ -319,10 +323,20 @@ fun SystemHealthCard(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(12.dp)
         ) {
+            val statusIcon = when (isHealthy) {
+                true -> Icons.Default.CheckCircle
+                false -> Icons.Default.Warning
+                null -> Icons.Default.Info
+            }
+            val statusColor = when (isHealthy) {
+                true -> DiagnosticGreen
+                false -> WarningRed
+                null -> TextMuted
+            }
             Icon(
-                imageVector = if (isHealthy) Icons.Default.CheckCircle else Icons.Default.Warning,
+                imageVector = statusIcon,
                 contentDescription = null,
-                tint = if (isHealthy) DiagnosticGreen else WarningRed,
+                tint = statusColor,
                 modifier = Modifier.size(24.dp)
             )
             Spacer(modifier = Modifier.width(12.dp))
@@ -334,7 +348,11 @@ fun SystemHealthCard(
                 Text(
                     text = "$status • $detail",
                     style = MaterialTheme.typography.bodySmall.copy(
-                        color = if (isHealthy) TextSecondary else WarningRed,
+                        color = when (isHealthy) {
+                            true -> TextSecondary
+                            false -> WarningRed
+                            null -> TextMuted
+                        },
                         fontSize = 11.sp
                     )
                 )
@@ -518,4 +536,3 @@ fun BluetoothConnectionIndicator(
 }
 
 private data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
-

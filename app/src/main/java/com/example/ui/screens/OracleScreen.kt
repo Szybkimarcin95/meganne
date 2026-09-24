@@ -225,14 +225,14 @@ fun OracleScreen(
                         ) {
                             Column {
                                 Text(
-                                    text = if (telemetry.isSimulated) "STATUS ŹRÓDŁA: SIMULATION / DEMO (K9K 636)" else "STATUS ŹRÓDŁA: FIZYCZNE OBD-II (MEASURED)",
+                                    text = if (telemetry.isSimulated) "STATUS ŹRÓDŁA: SIMULATION / DEMO (K9K 636)" else "SESJA: FIZYCZNE OBD-II • ŹRÓDŁO PER PARAMETR",
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         color = if (telemetry.isSimulated) AmberBose else DiagnosticGreen,
                                         fontWeight = FontWeight.Black
                                     )
                                 )
                                 Text(
-                                    text = if (telemetry.isSimulated) "Dane syntetyczne generowane do testów aplikacji" else "Dane na żywo z magistrali CAN / adaptera ELM327",
+                                    text = if (telemetry.isSimulated) "Dane syntetyczne generowane do testów aplikacji" else "Tylko udane odczyty są MEASURED; pozostałe pola pokazują BRAK DANYCH",
                                     style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary, fontSize = 10.sp)
                                 )
                             }
@@ -256,7 +256,7 @@ fun OracleScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         CockpitGauge(
-                            value = telemetry.rpm.toFloat(),
+                            value = telemetry.rpm.value?.toFloat(),
                             minValue = 0f,
                             maxValue = 5000f,
                             title = "Obroty (010C)",
@@ -266,7 +266,7 @@ fun OracleScreen(
                             modifier = Modifier.weight(1f)
                         )
                         CockpitGauge(
-                            value = telemetry.speedKmH.toFloat(),
+                            value = telemetry.speedKmH.value?.toFloat(),
                             minValue = 0f,
                             maxValue = 220f,
                             title = "Prędkość (010D)",
@@ -283,17 +283,17 @@ fun OracleScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         CockpitGauge(
-                            value = telemetry.coolantTempC.toFloat(),
+                            value = telemetry.coolantTempC.value?.toFloat(),
                             minValue = 40f,
                             maxValue = 120f,
                             title = "Ciecz (0105)",
                             unit = "°C",
-                            gaugeColor = if (telemetry.coolantTempC > 100) WarningRed else CyanHud,
+                            gaugeColor = if ((telemetry.coolantTempC.value ?: Int.MIN_VALUE) > 100) WarningRed else CyanHud,
                             warningThreshold = 102f,
                             modifier = Modifier.weight(1f)
                         )
                         CockpitGauge(
-                            value = telemetry.intakeAirTempC.toFloat(),
+                            value = telemetry.intakeAirTempC.value?.toFloat(),
                             minValue = -10f,
                             maxValue = 70f,
                             title = "Dolot (010F)",
@@ -318,27 +318,27 @@ fun OracleScreen(
                             
                             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                                 Text("0110: Przepływomierz MAF", color = TextSecondary, fontSize = 12.sp)
-                                Text("${telemetry.mafAirFlowGps} g/s", color = TextPrimary, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                                Text(telemetry.mafAirFlowGps.value?.let { "${it} g/s" } ?: "BRAK DANYCH", color = TextPrimary, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
                             }
                             Spacer(modifier = Modifier.height(6.dp))
                             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                                 Text("0104: Obciążenie silnika (Load)", color = TextSecondary, fontSize = 12.sp)
-                                Text("${telemetry.engineLoadPercent} %", color = TextPrimary, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                                Text(telemetry.engineLoadPercent.value?.let { "${it} %" } ?: "BRAK DANYCH", color = TextPrimary, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
                             }
                             Spacer(modifier = Modifier.height(6.dp))
                             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                                 Text("0111: Przepustnica (Throttle)", color = TextSecondary, fontSize = 12.sp)
-                                Text("${telemetry.throttlePercent} %", color = TextPrimary, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                                Text(telemetry.throttlePercent.value?.let { "${it} %" } ?: "BRAK DANYCH", color = TextPrimary, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
                             }
                             Spacer(modifier = Modifier.height(6.dp))
                             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                                 Text("010B: Ciśnienie dolotu (MAP)", color = TextSecondary, fontSize = 12.sp)
-                                Text("${telemetry.mapPressureKpa} kPa", color = TextPrimary, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                                Text(telemetry.mapPressureKpa.value?.let { "${it} kPa" } ?: "BRAK DANYCH", color = TextPrimary, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
                             }
                             Spacer(modifier = Modifier.height(6.dp))
                             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                                Text("Napięcie akumulatora (ELM327 ATRV)", color = TextSecondary, fontSize = 12.sp)
-                                Text("${telemetry.batteryVoltage} V", color = DiagnosticGreen, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                                Text("Napięcie akumulatora (0142 / ATRV)", color = TextSecondary, fontSize = 12.sp)
+                                Text(telemetry.batteryVoltage.value?.let { "${it} V" } ?: "BRAK DANYCH", color = if (telemetry.batteryVoltage.isAvailable) DiagnosticGreen else TextMuted, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
                             }
                         }
                     }
@@ -351,7 +351,7 @@ fun OracleScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         CockpitGauge(
-                            value = telemetry.boostBar,
+                            value = telemetry.boostBar.value,
                             minValue = 0.0f,
                             maxValue = 2.0f,
                             title = "Doładowanie Turbo",
@@ -361,7 +361,7 @@ fun OracleScreen(
                             modifier = Modifier.weight(1f)
                         )
                         CockpitGauge(
-                            value = telemetry.railPressureBar.toFloat(),
+                            value = telemetry.railPressureBar.value?.toFloat(),
                             minValue = 200f,
                             maxValue = 1800f,
                             title = "Ciśnienie CR",
@@ -381,6 +381,9 @@ fun OracleScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(14.dp)) {
+                            val soot = telemetry.dpfSootGrams.value
+                            val regenerating = telemetry.isRegeneratingDpf.value
+                            val oilDilution = telemetry.oilDilutionPercent.value
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -388,18 +391,26 @@ fun OracleScreen(
                             ) {
                                 Text("MASA SADZY W FILTRZE DPF", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = TextSecondary))
                                 Text(
-                                    "${telemetry.dpfSootGrams}g / 45g (Max)",
+                                    soot?.let { "${it}g / 45g (Max)" } ?: "BRAK DANYCH",
                                     style = MaterialTheme.typography.bodyMedium.copy(
                                         fontWeight = FontWeight.Black,
                                         fontFamily = FontFamily.Monospace,
-                                        color = if (telemetry.dpfSootGrams > 20f) WarningRed else AmberBose
+                                        color = when {
+                                            soot == null -> TextMuted
+                                            soot > 20f -> WarningRed
+                                            else -> AmberBose
+                                        }
                                     )
                                 )
                             }
                             Spacer(modifier = Modifier.height(8.dp))
                             LinearProgressIndicator(
-                                progress = { (telemetry.dpfSootGrams / 45f).coerceIn(0f, 1f) },
-                                color = if (telemetry.dpfSootGrams > 20f) WarningRed else AmberBose,
+                                progress = { soot?.let { (it / 45f).coerceIn(0f, 1f) } ?: 0f },
+                                color = when {
+                                    soot == null -> TextMuted
+                                    soot > 20f -> WarningRed
+                                    else -> AmberBose
+                                },
                                 trackColor = Color(0xFF131F33),
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -413,14 +424,18 @@ fun OracleScreen(
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text(
-                                    text = if (telemetry.isRegeneratingDpf) "TRWA REGENERACJA AKTYWNA" else "Stan: Pasywny (Regeneracja nieaktywna)",
+                                    text = when (regenerating) {
+                                        true -> "TRWA REGENERACJA AKTYWNA"
+                                        false -> "Stan: Pasywny (Regeneracja nieaktywna)"
+                                        null -> "Regeneracja: BRAK DANYCH"
+                                    },
                                     style = MaterialTheme.typography.labelSmall.copy(
-                                        color = if (telemetry.isRegeneratingDpf) DiagnosticGreen else TextMuted,
+                                        color = if (regenerating == true) DiagnosticGreen else TextMuted,
                                         fontWeight = FontWeight.Bold
                                     )
                                 )
                                 Text(
-                                    text = "Rozcieńczenie oleju: ${telemetry.oilDilutionPercent}%",
+                                    text = oilDilution?.let { "Rozcieńczenie oleju: ${it}%" } ?: "Rozcieńczenie oleju: BRAK DANYCH",
                                     style = MaterialTheme.typography.labelSmall.copy(color = TextSecondary)
                                 )
                             }
@@ -445,28 +460,28 @@ fun OracleScreen(
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text("CYL 1", style = MaterialTheme.typography.labelSmall.copy(color = TextMuted))
                                     Text(
-                                        "%.2f".format(telemetry.injector1Correction),
+                                        telemetry.injector1Correction.value?.let { "%.2f".format(it) } ?: "BRAK",
                                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = TextPrimary)
                                     )
                                 }
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text("CYL 2", style = MaterialTheme.typography.labelSmall.copy(color = TextMuted))
                                     Text(
-                                        "%.2f".format(telemetry.injector2Correction),
+                                        telemetry.injector2Correction.value?.let { "%.2f".format(it) } ?: "BRAK",
                                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = TextPrimary)
                                     )
                                 }
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text("CYL 3", style = MaterialTheme.typography.labelSmall.copy(color = TextMuted))
                                     Text(
-                                        "%.2f".format(telemetry.injector3Correction),
+                                        telemetry.injector3Correction.value?.let { "%.2f".format(it) } ?: "BRAK",
                                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = TextPrimary)
                                     )
                                 }
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text("CYL 4", style = MaterialTheme.typography.labelSmall.copy(color = TextMuted))
                                     Text(
-                                        "%.2f".format(telemetry.injector4Correction),
+                                        telemetry.injector4Correction.value?.let { "%.2f".format(it) } ?: "BRAK",
                                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = TextPrimary)
                                     )
                                 }
@@ -923,33 +938,28 @@ fun OracleScreen(
         )
     }
 
-    // Confirm Clear DTC dialog
+    // Mode 04 is outside the current READ-ONLY safety lane.
     if (showConfirmClearDtc) {
         AlertDialog(
             onDismissRequest = { showConfirmClearDtc = false },
             containerColor = CockpitSurfaceVariant,
-            title = { Text("Kasowanie kodów DTC (Mode 04)", color = WarningRed, fontWeight = FontWeight.Bold) },
+            title = {
+                Text(
+                    "Kasowanie DTC zablokowane",
+                    color = WarningRed,
+                    fontWeight = FontWeight.Bold
+                )
+            },
             text = {
                 Text(
-                    "„Kasowanie kodów może usunąć informacje diagnostyczne. Kontynuować?”\n\nUwaga: Standardowa komenda OBD-II Mode 04 czyści błędy emisji z ECU (SID307). Nie obsługuje modułów specyficznych Renault (np. BCM, ABS, moduł poduszek).",
+                    "Aplikacja działa w bezpiecznym trybie READ-ONLY. Mode 04 nie jest wysyłany do pojazdu.",
                     color = TextPrimary,
                     fontSize = 13.sp
                 )
             },
             confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.clearActiveDtcCodes()
-                        showConfirmClearDtc = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = WarningRed, contentColor = Color.White)
-                ) {
-                    Text("Kontynuuj")
-                }
-            },
-            dismissButton = {
                 TextButton(onClick = { showConfirmClearDtc = false }) {
-                    Text("Anuluj", color = TextSecondary)
+                    Text("OK", color = CyanHud)
                 }
             }
         )
@@ -1313,4 +1323,3 @@ fun DiagnosticReportCard(
         }
     }
 }
-
