@@ -37,11 +37,16 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,6 +60,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.model.VehicleSpec
 import com.example.data.obd.ObdConnectionState
+import com.example.ui.components.DiagnosticFloatingActionMenu
 import com.example.ui.screens.ArsenalScreen
 import com.example.ui.screens.BlackBoxScreen
 import com.example.ui.screens.DashboardScreen
@@ -64,6 +70,7 @@ import com.example.ui.theme.AmberBose
 import com.example.ui.theme.CockpitBackground
 import com.example.ui.theme.CockpitBorder
 import com.example.ui.theme.CockpitSurface
+import com.example.ui.theme.CockpitSurfaceVariant
 import com.example.ui.theme.CyanHud
 import com.example.ui.theme.CyanHudDim
 import com.example.ui.theme.DiagnosticGreen
@@ -93,6 +100,15 @@ fun OverlordApp(viewModel: OverlordViewModel = viewModel()) {
     val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
     val telemetry by viewModel.telemetry.collectAsStateWithLifecycle()
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
+    val quickActionStatus by viewModel.quickActionStatus.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(quickActionStatus) {
+        quickActionStatus?.let { msg ->
+            snackbarHostState.showSnackbar(msg)
+            viewModel.dismissQuickActionStatus()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -266,6 +282,50 @@ fun OverlordApp(viewModel: OverlordViewModel = viewModel()) {
                     modifier = Modifier.testTag("tab_arsenal")
                 )
             }
+        },
+        floatingActionButton = {
+            DiagnosticFloatingActionMenu(
+                onVerifyEcu = { viewModel.verifyEcu() },
+                onScanSensors = { viewModel.scanSensors() },
+                onRefreshConfig = { viewModel.refreshConfig() }
+            )
+        },
+        snackbarHost = {
+            SnackbarHost(
+                hostState = snackbarHostState,
+                snackbar = { data ->
+                    Surface(
+                        color = CockpitSurfaceVariant,
+                        shape = RoundedCornerShape(8.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, CyanHud),
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .testTag("diagnostic_status_snackbar")
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = CyanHud,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = data.visuals.message,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = TextPrimary,
+                                    fontWeight = FontWeight.Medium,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 12.sp
+                                )
+                            )
+                        }
+                    }
+                }
+            )
         },
         containerColor = CockpitBackground,
         modifier = Modifier.fillMaxSize()

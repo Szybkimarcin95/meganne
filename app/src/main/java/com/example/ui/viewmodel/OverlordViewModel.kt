@@ -745,6 +745,59 @@ class OverlordViewModel(application: Application) : AndroidViewModel(application
         _diagnosticCheckReport.value = null
     }
 
+    // Quick-Access Diagnostic Actions Feedback
+    private val _quickActionStatus = MutableStateFlow<String?>(null)
+    val quickActionStatus: StateFlow<String?> = _quickActionStatus.asStateFlow()
+
+    fun dismissQuickActionStatus() {
+        _quickActionStatus.value = null
+    }
+
+    /**
+     * Quick-Access Routine 1: Verify ECU
+     * Triggers ECU identification check and Mode 03 / Mode 07 DTC scan.
+     */
+    fun verifyEcu() {
+        viewModelScope.launch {
+            _quickActionStatus.value = "Uruchomiono weryfikację ECU (Mode 03/07)..."
+            runDiagnosticCheck()
+            _quickActionStatus.value = "Weryfikacja ECU zakończona pomyślnie"
+        }
+    }
+
+    /**
+     * Quick-Access Routine 2: Scan Sensors
+     * Samples live sensor telemetry (RPM, Speed, Boost, Coolant, Load, Rail Pressure) into trend points.
+     */
+    fun scanSensors() {
+        viewModelScope.launch {
+            _quickActionStatus.value = "Skanowanie i próbkowanie czujników..."
+            val t = telemetry.value
+            logSensorTrend("rpm", t.rpm.toFloat(), "obr/min")
+            logSensorTrend("speed", t.speedKmH.toFloat(), "km/h")
+            logSensorTrend("boost", t.boostBar, "bar")
+            logSensorTrend("coolant", t.coolantTempC.toFloat(), "°C")
+            logSensorTrend("rail", t.railPressureBar.toFloat(), "bar")
+            logSensorTrend("load", t.engineLoadPercent, "%")
+            delay(300)
+            _quickActionStatus.value = "Próbkowanie czujników silnika ukończone"
+        }
+    }
+
+    /**
+     * Quick-Access Routine 3: Refresh Config
+     * Reloads paired Bluetooth devices, re-evaluates connection status and transport configuration.
+     */
+    fun refreshConfig() {
+        viewModelScope.launch {
+            _quickActionStatus.value = "Odświeżanie konfiguracji adaptera..."
+            refreshBluetooth()
+            delay(250)
+            val devCount = pairedDevices.value.size
+            _quickActionStatus.value = "Konfiguracja odświeżona ($devCount urządzeń BT)"
+        }
+    }
+
     fun generateDtcHistorySummary(): String {
         val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
         val now = dateFormat.format(Date())
