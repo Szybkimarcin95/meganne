@@ -223,7 +223,8 @@ fun SystemHealthScreen(
                 source = DiagnosticSourceType.CANDIDATE,
                 measuredValue = "Kandydat profilu: CAN 11-bit / 500k (Tx: 0x7E0, Rx: 0x7E8) [HARDWARE NOT VERIFIED]",
                 nominalCondition = "Identyfikacja SID307 niepotwierdzona z pojazdu (hardware_io=OFF)",
-                detailMessage = "Adresy 0x7E0/0x7E8 i protokół ISO 15765-4 pochodzą z bazy referencyjnej. Brak aktywnej fizycznej weryfikacji DID sterownika."
+                detailMessage = "Adresy 0x7E0/0x7E8 i protokół ISO 15765-4 pochodzą z bazy referencyjnej. Brak aktywnej fizycznej weryfikacji DID sterownika.",
+                tooltipText = "Status CANDIDATE oraz HARDWARE NOT VERIFIED: Protokół i adresy CAN (0x7E0/0x7E8) pochodzą z bazy referencyjnej. Nie zostały jeszcze potwierdzone aktywnym odczytem z fizycznego pojazdu w tej sesji (hardware_io=OFF)."
             )
         }
 
@@ -235,7 +236,8 @@ fun SystemHealthScreen(
                 source = DiagnosticSourceType.FILE,
                 measuredValue = "Biała lista Least Privilege",
                 nominalCondition = "Zablokowane serwisy 04, 11, 27, 2E, 2F, 31, 34, 36, 3D",
-                detailMessage = "CommandFirewall uniemożliwia wysłanie niebezpiecznych komend modyfikujących pamięć sterownika."
+                detailMessage = "CommandFirewall uniemożliwia wysłanie niebezpiecznych komend modyfikujących pamięć sterownika.",
+                tooltipText = "Status PLIK (FILE) / READ_ONLY: Reguły firewall działają w oparciu o sztywną białą listę, blokując komendy modyfikujące stan ECU."
             )
         }
 
@@ -505,7 +507,8 @@ fun SystemHealthScreen(
                 source = DiagnosticSourceType.CANDIDATE,
                 measuredValue = "SID307_00F7_550_V05_20130313T104520.json (Kandydat historyczny)",
                 nominalCondition = "CP2 source unavailable (Weryfikacja plików wstrzymana)",
-                detailMessage = "Identyfikator autoidents z indeksu: {soft:00F7, diagver:129, supplier:4BE, ver:5500}. Brak fizycznych plików archiwów w środowisku."
+                detailMessage = "Identyfikator autoidents z indeksu: {soft:00F7, diagver:129, supplier:4BE, ver:5500}. Brak fizycznych plików archiwów w środowisku.",
+                tooltipText = "Status CANDIDATE: Profil sterownika (np. SID307) dopasowany na podstawie indeksu oprogramowania. Wymaga fizycznego potwierdzenia identyfikatorów z ECU."
             )
         }
 
@@ -517,7 +520,8 @@ fun SystemHealthScreen(
                 source = DiagnosticSourceType.UNKNOWN,
                 measuredValue = "Brak fizycznych plików w kontenerze",
                 nominalCondition = "Wymagana fizyczna obecność plików przed odblokowaniem importu",
-                detailMessage = "Zgodnie z regułą Least Privilege: komendy proprietary Renault/SID307 pozostają zablokowane."
+                detailMessage = "Zgodnie z regułą Least Privilege: komendy proprietary Renault/SID307 pozostają zablokowane.",
+                tooltipText = "Status BLOCKED_PENDING_VERIFICATION: Zewnętrzne archiwa wymagane do pełnych odczytów proprietary nie są dostępne w środowisku. Obowiązuje polityka Least Privilege."
             )
         }
 
@@ -529,7 +533,8 @@ fun SystemHealthScreen(
                 source = DiagnosticSourceType.FILE,
                 measuredValue = "Brak bezpośredniej transmisji do auta",
                 nominalCondition = "Wyłącznie bezpieczna weryfikacja programowa",
-                detailMessage = "Aplikacja działa w trybie bezpiecznym bez wykonywania fizycznych poleceń magistrali."
+                detailMessage = "Aplikacja działa w trybie bezpiecznym bez wykonywania fizycznych poleceń magistrali.",
+                tooltipText = "Status FILE / HARDWARE_IO_OFF: Tor transmisji sprzętowej jest bezpiecznie wyłączony, co zapobiega niezamierzonej modyfikacji stanu pojazdu."
             )
         }
 

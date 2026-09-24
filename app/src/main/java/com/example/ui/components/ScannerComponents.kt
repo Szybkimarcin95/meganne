@@ -34,6 +34,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -320,8 +324,10 @@ fun HealthStateRow(
     measuredValue: String? = null,
     nominalCondition: String? = null,
     detailMessage: String? = null,
+    tooltipText: String? = null,
     modifier: Modifier = Modifier
 ) {
+    var showTooltipDialog by remember { mutableStateOf(false) }
     val (statusBg, statusBorder, statusIcon, _) = when (statusCode) {
         HealthStatusCode.PASS -> QuadStatus(ScannerStatusPassDim, ScannerStatusPass, Icons.Default.CheckCircle, statusText)
         HealthStatusCode.ALERT -> QuadStatus(ScannerStatusAlertDim, ScannerStatusAlert, Icons.Default.Warning, statusText)
@@ -357,6 +363,22 @@ fun HealthStateRow(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     SourceBadge(source = source)
+                    if (tooltipText != null) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        androidx.compose.material3.IconButton(
+                            onClick = { showTooltipDialog = true },
+                            modifier = Modifier
+                                .size(28.dp)
+                                .testTag("info_button_${title.lowercase().replace(" ", "_")}")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "Informacja o statusie $title",
+                                tint = ScannerAccent,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
                 }
 
                 // Evidence status tag
@@ -434,6 +456,36 @@ fun HealthStateRow(
                 )
             }
         }
+    }
+
+    if (showTooltipDialog && tooltipText != null) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showTooltipDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Info, contentDescription = null, tint = ScannerAccent, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Wyjaśnienie statusu: $title",
+                        style = MaterialTheme.typography.titleMedium.copy(color = ScannerTextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    )
+                }
+            },
+            text = {
+                Column {
+                    Text(
+                        text = tooltipText,
+                        style = MaterialTheme.typography.bodySmall.copy(color = ScannerTextSecondary, fontSize = 11.sp, lineHeight = 15.sp)
+                    )
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { showTooltipDialog = false }) {
+                    Text("ZAMKNIJ", color = ScannerTextPrimary, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                }
+            },
+            containerColor = ScannerSurface
+        )
     }
 }
 
