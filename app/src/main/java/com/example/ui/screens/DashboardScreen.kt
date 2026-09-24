@@ -288,6 +288,8 @@ private fun ScannerLiveDataView(viewModel: OverlordViewModel) {
     val isConnected = telemetry.isConnected
     val isSimulated = telemetry.isSimulated
 
+    var selectedGroup by remember { mutableStateOf("WSZYSTKIE") }
+
     val source = when {
         isSimulated -> DiagnosticSourceType.SIMULATED
         isConnected -> DiagnosticSourceType.LIVE
@@ -315,6 +317,44 @@ private fun ScannerLiveDataView(viewModel: OverlordViewModel) {
                 badgeText = if (isConnected || isSimulated) "STRUMIEŃ AKTYWNY" else "OFFLINE",
                 badgeColor = if (isConnected) ScannerStatusPass else if (isSimulated) ScannerStatusWarning else ScannerTextMuted
             )
+        }
+
+        // Tabbed Filter Row
+        item {
+            val groups = listOf("WSZYSTKIE", "SILNIK", "POWIETRZE / DOLOT", "TEMPERATURY")
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                groups.forEach { group ->
+                    val isSelected = selectedGroup == group
+                    Surface(
+                        color = if (isSelected) ScannerAccentDim else ScannerSurface,
+                        shape = RoundedCornerShape(3.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) ScannerAccent else ScannerBorder),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(30.dp)
+                            .clickable { selectedGroup = group }
+                            .testTag("filter_group_${group.lowercase().replace(" / ", "_").replace(" ", "_")}")
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Text(
+                                text = group,
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = if (isSelected) ScannerAccent else ScannerTextSecondary,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    fontSize = 8.sp,
+                                    fontFamily = FontFamily.Monospace
+                                ),
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         // Live Parameters Table Rows
