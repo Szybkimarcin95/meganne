@@ -14,10 +14,20 @@ import argparse
 import json
 import re
 import xml.etree.ElementTree as ET
+import xml.parsers.expat
 from pathlib import Path
 from typing import Any
 
 READ_SERVICES = {"19", "21", "22"}
+
+NRC_POLICY = {
+    "12": {"name": "subFunctionNotSupported", "runtimeAction": "mark_unsupported"},
+    "13": {"name": "incorrectMessageLengthOrInvalidFormat", "runtimeAction": "do_not_retry_without_request_fix"},
+    "22": {"name": "conditionsNotCorrect", "runtimeAction": "bounded_retry_or_skip"},
+    "31": {"name": "requestOutOfRange", "runtimeAction": "mark_unsupported_for_this_ecu"},
+    "33": {"name": "securityAccessDenied", "runtimeAction": "security_blocked"},
+    "78": {"name": "responsePending", "runtimeAction": "extend_timeout"},
+}
 
 
 def local(tag: str) -> str:
@@ -66,6 +76,30 @@ def parse_can_id(container: ET.Element | None) -> str | None:
         return f"{int(raw):X}" if raw is not None else None
     except ValueError:
         return raw
+
+
+def collect_request_source_lines(path: Path) -> list[int]:
+    """Collect <Request> start-tag line numbers using the stdlib expat parser."""
+    lines: list[int] = []
+    parser = xml.parsers.expat.ParserCreate()
+
+    def start_element(name: str, attrs: dict[str, str]) -> None:
+        if name.rsplit(":", 1)[-1] == "Request":
+            lines.append(parser.CurrentLineNumber)
+
+    parser.StartElementHandler = start_element
+    with path.open("rb") as handle:
+        while chunk := handle.read(1024 * 1024):
+            parser.Parse(chunk, False)
+    parser.Parse(b"", True)
+    return lines
+
+
+def parse_access_constraints(request: ET.Element) -> list[str]:
+    deny_access = child(request, "DenyAccess")
+    if deny_access is None:
+        return []
+    return [local(x.tag) for x in list(deny_access)]
 
 
 def parse_data_definition(element: ET.Element) -> dict[str, Any]:
@@ -138,6 +172,17 @@ def main() -> int:
     args = parser.parse_args()
 
     root = ET.parse(args.xml).getroot()
+    request_source_lines = collect_request_source_lines(args.xml)
+    request_elements = [x for x in root.iter() if local(x.tag) == "Request"]
+    if len(request_source_lines) != len(request_elements):
+        raise RuntimeError(
+            "Request source-line count does not match parsed Request element count: "
+            f"{len(request_source_lines)} != {len(request_elements)}"
+        )
+    request_line_by_id = {
+        id(request): line
+        for request, line in zip(request_elements, request_source_lines, strict=True)
+    }
     target = first_descendant(root, "Target")
     can = first_descendant(root, "CAN")
     send_id = parse_can_id(child(can, "SendId"))
@@ -191,6 +236,9 @@ def main() -> int:
         if received is not None and received.attrib.get("MinBytes"):
             minimum_bytes = int(received.attrib["MinBytes"])
 
+        access_constraints = parse_access_constraints(request)
+        has_no_sds_constraint = "NoSDS" in access_constraints
+
         requests.append(
             {
                 "name": request.attrib.get("Name", ""),
@@ -201,6 +249,21 @@ def main() -> int:
                 "manualSend": child(request, "ManuelSend") is not None,
                 "inputs": inputs,
                 "outputs": outputs,
+                "nrcPolicy": NRC_POLICY,
+                "requiredSession": None,
+                "sessionPrerequisite": (
+                    {
+                        "kind": "diagnosticSessionRequired",
+                        "source": "DenyAccess/NoSDS",
+                        "requiredSession": None,
+                    }
+                    if has_no_sds_constraint
+                    else None
+                ),
+                "accessConstraints": access_constraints,
+                "securityRequired": None,
+                "sourceLine": request_line_by_id[id(request)],
+                "excludedFromRead": False,
                 "executable": False,
             }
         )
@@ -208,7 +271,7 @@ def main() -> int:
     description = text(child(target, "Description")) if target is not None else ""
 
     manifest = {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "sourceType": "DDT2000_XML",
         "sourceFile": args.xml.name,
         "target": target.attrib.get("Name") if target is not None else None,
