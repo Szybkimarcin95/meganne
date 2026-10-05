@@ -58,12 +58,15 @@ data class PhysicalEcuIdentity(
     val supplier: String?,
     val software: String?,
     val version: String?,
-    val receiveCanId: String? = null
+    val receiveCanId: String? = null,
+    val protocol: String? = null,
+    val baudRate: Int? = null
 )
 
 enum class DdtVehicleMatchStatus {
     EXACT_AUTOIDENT_MATCH,
     AUTOIDENT_MISMATCH,
+    TRANSPORT_MISMATCH,
     INSUFFICIENT_DATA
 }
 
