@@ -51,12 +51,12 @@ class EcuLabScreenTest {
             }
         }
 
-        composeTestRule.onNodeWithTag("count_supported").assertTextContains("1")
-        composeTestRule.onNodeWithTag("count_nrc").assertTextContains("1")
-        composeTestRule.onNodeWithTag("count_timeout").assertTextContains("1")
-        composeTestRule.onNodeWithTag("count_session").assertTextContains("1")
-        composeTestRule.onNodeWithTag("count_not_tested").assertTextContains("980")
-        composeTestRule.onNodeWithTag("count_cancelled").assertTextContains("0")
+        composeTestRule.onNodeWithTag("count_supported_value").assertTextContains("1")
+        composeTestRule.onNodeWithTag("count_nrc_value").assertTextContains("1")
+        composeTestRule.onNodeWithTag("count_timeout_value").assertTextContains("1")
+        composeTestRule.onNodeWithTag("count_session_value").assertTextContains("1")
+        composeTestRule.onNodeWithTag("count_not_tested_value").assertTextContains("980")
+        composeTestRule.onNodeWithTag("count_cancelled_value").assertTextContains("0")
         composeTestRule.onNodeWithTag("ecu_lab_progress").assertIsDisplayed()
         composeTestRule.onNodeWithTag("ecu_row_222496").assertIsDisplayed()
     }
