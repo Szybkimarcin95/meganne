@@ -30,6 +30,9 @@ class DdtCapabilityIndexerTest {
                   "name": "Read engine state",
                   "sentbytes": "22 F1 90",
                   "replybytes": "62F190",
+                  "minbytes": 8,
+                  "shiftbytescount": 1,
+                  "deny_sds": ["plant", "supplier"],
                   "receivebyte_dataitems": {
                     "ENGINE_STATE": {"firstbyte": 4}
                   }
@@ -50,6 +53,7 @@ class DdtCapabilityIndexerTest {
         """.trimIndent()
 
         val result = indexer.indexJson(json, "SID307_TEST.json")
+        val readState = result.capabilities.first { it.requestName == "Read engine state" }
 
         assertEquals("SID307_TEST", result.ecuName)
         assertEquals("CAN", result.protocol)
@@ -63,7 +67,10 @@ class DdtCapabilityIndexerTest {
         assertEquals("01", result.autoIdents.single().version)
         assertFalse(result.vehicleMatchConfirmed)
 
-        assertEquals(DdtOperationClass.READ, result.capabilities.first { it.requestName == "Read engine state" }.operationClass)
+        assertEquals(DdtOperationClass.READ, readState.operationClass)
+        assertEquals(8, readState.minimumResponseBytes)
+        assertEquals(1, readState.shiftBytesCount)
+        assertEquals(listOf("plant", "supplier"), readState.deniedSessionNames)
         assertEquals(DdtOperationClass.CONFIGURATION, result.capabilities.first { it.requestName == "Configuration write" }.operationClass)
         assertEquals(DdtOperationClass.ACTUATOR_TEST, result.capabilities.first { it.requestName == "Actuator test" }.operationClass)
         assertFalse(result.capabilities.any { it.executable })
