@@ -29,6 +29,13 @@ data class DdtCapability(
     val executable: Boolean = false
 )
 
+data class DdtAutoIdent(
+    val diagnosticVersion: String?,
+    val supplier: String?,
+    val software: String?,
+    val version: String?
+)
+
 data class DdtEcuDescriptor(
     val ecuName: String?,
     val protocol: String?,
@@ -37,8 +44,32 @@ data class DdtEcuDescriptor(
     val functionalAddress: String?,
     val baudRate: Int?,
     val endianness: String?,
-    val autoIdentCount: Int,
+    val autoIdents: List<DdtAutoIdent>,
     val capabilities: List<DdtCapability>,
     val sourceFile: String,
     val vehicleMatchConfirmed: Boolean = false
+) {
+    val autoIdentCount: Int
+        get() = autoIdents.size
+}
+
+data class PhysicalEcuIdentity(
+    val diagnosticVersion: String?,
+    val supplier: String?,
+    val software: String?,
+    val version: String?,
+    val receiveCanId: String? = null
+)
+
+enum class DdtVehicleMatchStatus {
+    EXACT_AUTOIDENT_MATCH,
+    AUTOIDENT_MISMATCH,
+    INSUFFICIENT_DATA
+}
+
+data class DdtVehicleMatchResult(
+    val status: DdtVehicleMatchStatus,
+    val matchedAutoIdent: DdtAutoIdent? = null,
+    val matchedFields: Set<String> = emptySet(),
+    val mismatchedFields: Set<String> = emptySet()
 )
