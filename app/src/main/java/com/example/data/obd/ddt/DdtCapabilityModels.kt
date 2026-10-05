@@ -25,6 +25,9 @@ data class DdtCapability(
     val manualSend: Boolean,
     val inputDataNames: List<String>,
     val outputDataNames: List<String>,
+    val minimumResponseBytes: Int? = null,
+    val shiftBytesCount: Int? = null,
+    val deniedSessionNames: List<String> = emptyList(),
     val source: String = "DDT_DATABASE",
     val executable: Boolean = false
 )
