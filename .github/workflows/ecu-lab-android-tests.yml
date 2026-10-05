@@ -1,0 +1,49 @@
+name: ECU Lab Android Tests
+
+on:
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "app/src/main/java/com/example/ui/eculab/**"
+      - "app/src/main/java/com/example/ui/screens/EcuLabScreen.kt"
+      - "app/src/main/java/com/example/ui/screens/ArsenalScreen.kt"
+      - "app/src/main/java/com/example/ui/viewmodel/OverlordViewModel.kt"
+      - "app/src/test/java/com/example/ui/eculab/**"
+      - "app/src/test/java/com/example/ui/screens/EcuLabScreenTest.kt"
+      - ".github/workflows/ecu-lab-android-tests.yml"
+
+jobs:
+  ecu-lab-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Android SDK packages
+        shell: bash
+        run: |
+          SDKMANAGER="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
+          test -x "${SDKMANAGER}"
+          yes | "${SDKMANAGER}" --licenses >/dev/null || true
+          "${SDKMANAGER}"             "platform-tools"             "platforms;android-36.1"             "build-tools;36.0.0"
+          echo "sdk.dir=${ANDROID_HOME}" > local.properties
+
+      - name: Set up Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.3.1"
+
+      - name: Compile ECU Lab UI
+        run: gradle :app:compileDebugKotlin --no-daemon --stacktrace
+
+      - name: Run ECU Lab model and Compose tests
+        run: |
+          gradle :app:testDebugUnitTest             --tests 'com.example.ui.eculab.EcuLabModelsTest'             --tests 'com.example.ui.screens.EcuLabScreenTest'             --no-daemon             --stacktrace
