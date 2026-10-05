@@ -30,9 +30,19 @@ The current checkpoint remains read-only at runtime.
   - UNKNOWN
 - Every imported capability defaults to `executable=false`.
 - Physical ECU AutoIdent matcher.
+- Transport-aware vehicle match:
+  - response CAN ID
+  - protocol
+  - baud rate
 - Vehicle-specific SID307 target profile.
-- Read-only candidate catalog that stays empty until an exact four-field AutoIdent match succeeds.
-- No command is sent to the vehicle by these DDT indexing/matching modules.
+- Read-only candidate catalog that stays empty until the ECU definition exactly matches the physical ECU.
+- Capability audit summary with operation counts and guarded-operation counts.
+- Database-aware DDT READ policy:
+  - command must exist in the matched definition,
+  - request must be classified READ,
+  - unknown commands remain blocked,
+  - state-changing service families remain hard-blocked.
+- No command is sent to the vehicle by these DDT indexing/matching/policy modules.
 
 ## Physical ECU match
 
@@ -49,7 +59,15 @@ The supplied DDT inventories contain the matching definition:
 
 `SID307_00F7_550_V05_20130313T104520`
 
-The match decision is based on AutoIdent data, not filename similarity.
+The match decision is based on the physical identity tuple plus transport metadata, not filename similarity.
+
+## Runtime safety boundary
+
+The existing production `CommandFirewall` remains unchanged and still blocks Renault-specific `0x19` / `0x22` traffic.
+
+The new `DdtReadOnlyCommandPolicy` is a separate dynamic allowlist and does not bypass `SafeDiagnosticSession`. It is deliberately not wired to physical transport yet.
+
+This separation lets the project fully index and audit the matched SID307 definition before the first Renault-specific physical read is enabled.
 
 ## Electrical continuity scope
 
@@ -61,10 +79,10 @@ The application must distinguish:
 
 ## Next checkpoint
 
-1. Import only the matched SID307 JSON definition (and only required referenced metadata), not the whole DDT archive.
-2. Generate a request-level capability manifest with provenance and operation class.
-3. Compare classified READ requests against the existing `CommandFirewall`.
-4. Add a database-aware READ gate for requests that are source-backed, exact-ECU-matched and explicitly allowed.
-5. Build the ECU Lab capability browser UI.
-6. Validate physical READ transport on the real ELM327.
+1. Extract the actual matched `SID307_00F7_550_V05_20130313T104520.json` from the supplied archive.
+2. Generate a request-level capability manifest with provenance and operation class from the real file.
+3. Review UNKNOWN and ambiguous operation classifications manually.
+4. Build the ECU Lab capability browser UI from that manifest.
+5. Add a controlled integration path from `SafeDiagnosticSession` to `DdtReadOnlyCommandPolicy`.
+6. Validate only selected READ requests on the real ELM327.
 7. Keep WRITE / ACTUATOR / RESET / CONFIGURATION / SECURITY_ACCESS disabled until their separate audit and confirmation policy is implemented.
