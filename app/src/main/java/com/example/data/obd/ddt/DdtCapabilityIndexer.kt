@@ -64,6 +64,9 @@ class DdtCapabilityIndexer(
                 manualSend = req["manualsend"] as? Boolean ?: false,
                 inputDataNames = sendItems,
                 outputDataNames = receiveItems,
+                minimumResponseBytes = req["minbytes"].asInt(),
+                shiftBytesCount = req["shiftbytescount"].asInt(),
+                deniedSessionNames = req["deny_sds"].asStringList(),
                 executable = false
             )
         }.sortedWith(compareBy({ it.operationClass.ordinal }, { it.requestName.lowercase(Locale.ROOT) }))
@@ -74,7 +77,7 @@ class DdtCapabilityIndexer(
             sendId = obd?.get("send_id").asIdentityString(),
             receiveId = obd?.get("recv_id").asIdentityString(),
             functionalAddress = obd?.get("funcaddr").asIdentityString(),
-            baudRate = (obd?.get("baudrate") as? Number)?.toInt(),
+            baudRate = obd?.get("baudrate").asInt(),
             endianness = root["endian"] as? String,
             autoIdents = autoidents,
             capabilities = capabilities,
@@ -145,6 +148,21 @@ class DdtCapabilityIndexer(
             is String -> trim().takeIf { it.isNotEmpty() }
             is Number -> toString()
             else -> toString().trim().takeIf { it.isNotEmpty() }
+        }
+
+    private fun Any?.asInt(): Int? =
+        when (this) {
+            is Number -> toInt()
+            is String -> trim().toIntOrNull()
+            else -> null
+        }
+
+    private fun Any?.asStringList(): List<String> =
+        when (this) {
+            is List<*> -> mapNotNull { it.asIdentityString() }.distinct()
+            is Map<*, *> -> keys.mapNotNull { it.asIdentityString() }.distinct()
+            is String -> listOfNotNull(asIdentityString())
+            else -> emptyList()
         }
 
     @Suppress("UNCHECKED_CAST")
