@@ -26,7 +26,7 @@ jobs:
           - language: actions
             build-mode: none
           - language: java-kotlin
-            build-mode: manual
+            build-mode: none
           - language: python
             build-mode: none
 
@@ -34,49 +34,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Set up Java 17
-        if: matrix.language == 'java-kotlin'
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-
-      - name: Install required Android SDK packages
-        if: matrix.language == 'java-kotlin'
-        shell: bash
-        run: |
-          SDKMANAGER="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
-          test -x "${SDKMANAGER}"
-          yes | "${SDKMANAGER}" --licenses >/dev/null || true
-          "${SDKMANAGER}"             "platform-tools"             "platforms;android-36.1"             "build-tools;36.0.0"
-          echo "sdk.dir=${ANDROID_HOME}" > local.properties
-
-      - name: Set up Gradle 9.3.1
-        if: matrix.language == 'java-kotlin'
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "9.3.1"
-          cache-read-only: false
-
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           queries: security-extended
-
-      - name: Compile Android sources for CodeQL
-        if: matrix.language == 'java-kotlin'
-        shell: bash
-        run: |
-          gradle \
-            clean \
-            :app:compileDebugKotlin \
-            :app:compileDebugJavaWithJavac \
-            --no-daemon \
-            --no-build-cache \
-            --rerun-tasks \
-            --stacktrace
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
