@@ -31,7 +31,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -82,8 +82,9 @@ fun ArsenalScreen(
     ) {
         Spacer(modifier = Modifier.height(4.dp))
 
-        TabRow(
+        ScrollableTabRow(
             selectedTabIndex = selectedSubTab,
+            edgePadding = 0.dp,
             containerColor = CockpitSurface,
             contentColor = CyanHud,
             modifier = Modifier
