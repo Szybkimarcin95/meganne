@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,11 +33,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -45,6 +49,7 @@ import com.example.ui.eculab.EcuLabServiceFilter
 import com.example.ui.eculab.EcuLabSort
 import com.example.ui.eculab.EcuLabStatus
 import com.example.ui.eculab.EcuLabUiState
+import com.example.ui.eculab.exportEcuLabResultsToJson
 import com.example.ui.eculab.EcuReadResult
 import com.example.ui.theme.AmberBose
 import com.example.ui.theme.CockpitBorder
@@ -56,6 +61,7 @@ import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.ui.theme.WarningRed
+import kotlinx.coroutines.launch
 
 @Composable
 fun EcuLabScreen(
@@ -66,9 +72,20 @@ fun EcuLabScreen(
     onGroupBySessionChange: (Boolean) -> Unit,
     onSortChange: (EcuLabSort) -> Unit,
     onCancelScan: () -> Unit,
-    onExport: () -> Unit,
+    onExportFinished: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            onExportFinished(exportEcuLabResultsToJson(context, uri, state))
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -173,7 +190,9 @@ fun EcuLabScreen(
                 Text(if (state.cancelRequested) "CANCELLING…" else "Cancel Scan")
             }
             Button(
-                onClick = onExport,
+                onClick = {
+                    exportLauncher.launch("sid307_ecu_lab_results.json")
+                },
                 enabled = state.results.isNotEmpty(),
                 modifier = Modifier
                     .weight(1f)
