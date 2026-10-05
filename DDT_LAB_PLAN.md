@@ -6,9 +6,9 @@ Branch: `feature/ddt-capability-browser`
 
 Turn the project from a generic OBD-II reader into a vehicle-specific Renault ECU laboratory driven by verified DDT database content.
 
-The first checkpoint is intentionally read-only at runtime.
+The current checkpoint remains read-only at runtime.
 
-## What this checkpoint adds
+## Completed in this branch
 
 - DDT4All JSON schema indexing for ECU definition files from `ecu.zip`.
 - ECU metadata extraction:
@@ -17,9 +17,8 @@ The first checkpoint is intentionally read-only at runtime.
   - functional address
   - baud rate
   - endian
-  - AutoIdent count
-- Request inventory.
-- Request input/output data-name inventory.
+  - AutoIdent metadata
+- Request inventory and request input/output data-name inventory.
 - Conservative operation classification:
   - READ
   - WRITE
@@ -30,17 +29,27 @@ The first checkpoint is intentionally read-only at runtime.
   - SESSION_CONTROL
   - UNKNOWN
 - Every imported capability defaults to `executable=false`.
-- No command is sent to the vehicle by this module.
+- Physical ECU AutoIdent matcher.
+- Vehicle-specific SID307 target profile.
+- Read-only candidate catalog that stays empty until an exact four-field AutoIdent match succeeds.
+- No command is sent to the vehicle by these DDT indexing/matching modules.
 
-## Why this matters
+## Physical ECU match
 
-Instead of exposing generic PIDs, the app can build a capability screen from the exact ECU definition selected for the car. This is the basis for:
+The supplied vehicle diagnostic export identifies:
 
-1. ECU identification and exact file matching.
-2. Renault-specific live values.
-3. ECU-reported electrical diagnostics and plausibility checks.
-4. Connector/sensor/actuator troubleshooting based on real ECU signals.
-5. Later guarded actuator tests and configuration changes.
+- CAN 11-bit / 500 kbaud
+- ECU response address 7E8
+- diag version 129
+- supplier 4BE
+- software 00F7
+- version 5500
+
+The supplied DDT inventories contain the matching definition:
+
+`SID307_00F7_550_V05_20130313T104520`
+
+The match decision is based on AutoIdent data, not filename similarity.
 
 ## Electrical continuity scope
 
@@ -52,9 +61,10 @@ The application must distinguish:
 
 ## Next checkpoint
 
-1. Locate/import the user's actual `ecu.zip` / DDT database.
-2. Index the SID307 candidates already listed in project provenance.
-3. Match AutoIdent against the physical ECU.
-4. Generate a vehicle-specific capability catalog.
-5. Unlock only verified READ requests through a database-aware extension to CommandFirewall.
-6. Keep WRITE/ACTUATOR/RESET/CONFIGURATION disabled until each request has explicit source + ECU match + confirmation policy.
+1. Import only the matched SID307 JSON definition (and only required referenced metadata), not the whole DDT archive.
+2. Generate a request-level capability manifest with provenance and operation class.
+3. Compare classified READ requests against the existing `CommandFirewall`.
+4. Add a database-aware READ gate for requests that are source-backed, exact-ECU-matched and explicitly allowed.
+5. Build the ECU Lab capability browser UI.
+6. Validate physical READ transport on the real ELM327.
+7. Keep WRITE / ACTUATOR / RESET / CONFIGURATION / SECURITY_ACCESS disabled until their separate audit and confirmation policy is implemented.
