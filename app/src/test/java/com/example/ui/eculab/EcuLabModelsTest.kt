@@ -109,6 +109,74 @@ class EcuLabModelsTest {
         assertTrue(state.progressFraction == 0.5f)
     }
 
+    @Test
+    fun scheduler_mapper_normalizes_nrc_and_preserves_all_decoded_values() {
+        val manifest = mapOf<String, Any?>(
+            "sentBytes" to "222496",
+            "name" to "Particulate filter data",
+            "service" to "22",
+            "sourceLine" to 19220,
+            "requiredSession" to null
+        )
+        val scheduler = mapOf<String, Any?>(
+            "kind" to "nrc",
+            "uiStatus" to "UNSUPPORTED",
+            "request" to "222496",
+            "code" to "31",
+            "meaning" to "requestOutOfRange",
+            "rawHex" to "7F2231"
+        )
+
+        val mapped = mapSchedulerResult(scheduler, manifest)
+
+        assertEquals(EcuLabStatus.NRC, mapped.status)
+        assertEquals(0x31, mapped.nrc)
+        assertEquals("requestOutOfRange", mapped.nrcMeaning)
+        assertEquals(19220, mapped.sourceLine)
+    }
+
+    @Test
+    fun scheduler_mapper_keeps_multi_output_positive_response() {
+        val manifest = mapOf<String, Any?>(
+            "sentBytes" to "2181",
+            "name" to "DataRead.VIN",
+            "service" to "21",
+            "sourceLine" to 1
+        )
+        val scheduler = mapOf<String, Any?>(
+            "kind" to "positive",
+            "uiStatus" to "SUPPORTED",
+            "request" to "2181",
+            "response" to "6181...",
+            "sourceLine" to 1,
+            "values" to listOf(
+                mapOf("name" to "VIN", "value" to "VF1KZ140647630778", "unit" to null, "rawHex" to "564631..."),
+                mapOf("name" to "VINcrc", "value" to 0x65E6, "unit" to null, "rawHex" to "65E6")
+            )
+        )
+
+        val mapped = mapSchedulerResult(scheduler, manifest)
+
+        assertEquals(EcuLabStatus.SUPPORTED, mapped.status)
+        assertEquals(2, mapped.decodedValues.size)
+        assertEquals("VF1KZ140647630778", mapped.decodedValues.first().value)
+    }
+
+    @Test
+    fun explicit_not_tested_placeholders_do_not_inflate_progress() {
+        val state = EcuLabUiState(
+            totalRequests = 3,
+            results = listOf(
+                result("222401", EcuLabStatus.SUPPORTED),
+                result("222496", EcuLabStatus.NOT_TESTED),
+                result("222801", EcuLabStatus.NOT_TESTED)
+            )
+        )
+
+        assertEquals(1, state.completedCount)
+        assertEquals(2, state.counters.notTested)
+    }
+
     private fun result(
         request: String,
         status: EcuLabStatus,
