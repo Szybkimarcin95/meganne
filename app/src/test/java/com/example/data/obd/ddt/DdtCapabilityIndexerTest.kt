@@ -80,6 +80,8 @@ class DdtCapabilityIndexerTest {
     fun classifiesSecurityResetAndUnknownConservatively() {
         assertEquals(DdtOperationClass.SECURITY_ACCESS, indexer.classifyOperation("Security", "27 01"))
         assertEquals(DdtOperationClass.RESET, indexer.classifyOperation("ECU reset", "11 01"))
+        assertEquals(DdtOperationClass.RESET, indexer.classifyOperation("Clear diagnostics", "14 FFFFFF"))
+        assertEquals(DdtOperationClass.ACTUATOR_TEST, indexer.classifyOperation("StopRoutineByLocalIdentifier", "32 00 00"))
         assertEquals(DdtOperationClass.UNKNOWN, indexer.classifyOperation("Mystery", "AA55"))
     }
 
