@@ -15,6 +15,8 @@ object MeganeSid307Target {
         supplier = "4BE",
         software = "00F7",
         version = "5500",
-        receiveCanId = "7E8"
+        receiveCanId = "7E8",
+        protocol = "CAN",
+        baudRate = 500000
     )
 }
