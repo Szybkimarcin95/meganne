@@ -96,11 +96,13 @@ class DdtReadOnlyCommandPolicy(
     private companion object {
         val HARD_BLOCKED_SERVICES = setOf(
             "11", // ECUReset
+            "14", // ClearDiagnosticInformation
             "27", // SecurityAccess
             "2E", // WriteDataByIdentifier
             "2F", // InputOutputControlByIdentifier
             "30", // legacy IO/control family used by source DBs
-            "31", // RoutineControl
+            "31", // RoutineControl start
+            "32", // RoutineControl stop
             "34", // RequestDownload
             "36", // TransferData
             "37", // RequestTransferExit
