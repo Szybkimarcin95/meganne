@@ -30,6 +30,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,6 +62,7 @@ import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.ui.theme.WarningRed
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
@@ -77,6 +79,13 @@ fun EcuLabScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var searchDraft by rememberSaveable { mutableStateOf(state.query) }
+
+    LaunchedEffect(searchDraft) {
+        delay(200)
+        if (searchDraft != state.query) onQueryChange(searchDraft)
+    }
+
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
@@ -96,8 +105,8 @@ fun EcuLabScreen(
         Spacer(Modifier.height(8.dp))
 
         OutlinedTextField(
-            value = state.query,
-            onValueChange = onQueryChange,
+            value = searchDraft,
+            onValueChange = { searchDraft = it },
             label = { Text("Szukaj po nazwie lub request/DID") },
             placeholder = { Text("np. soot, rail, 0x2224") },
             singleLine = true,
@@ -401,6 +410,16 @@ private fun EcuLabResultRow(result: EcuReadResult) {
                     fontFamily = FontFamily.Monospace,
                     fontSize = 9.sp
                 )
+            }
+            if (result.decodedValues.isNotEmpty()) {
+                result.decodedValues.forEach { decoded ->
+                    Text(
+                        "${decoded.name}: ${decoded.value ?: "—"} ${decoded.unit.orEmpty()}  [raw ${decoded.rawHex ?: "—"}]",
+                        color = DiagnosticGreen,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 9.sp
+                    )
+                }
             }
             Text(
                 "Source: ${result.sourceFile}:${result.sourceLine}",
