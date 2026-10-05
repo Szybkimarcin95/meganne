@@ -8,6 +8,8 @@ on:
       - "app/src/main/java/com/example/ui/screens/EcuLabScreen.kt"
       - "app/src/main/java/com/example/ui/screens/ArsenalScreen.kt"
       - "app/src/main/java/com/example/ui/viewmodel/OverlordViewModel.kt"
+      - "app/src/main/java/com/example/data/obd/ddt/DdtReadOnlyCommandPolicy.kt"
+      - "app/src/test/java/com/example/data/obd/ddt/DdtReadOnlyCommandPolicyTest.kt"
       - "app/src/test/java/com/example/ui/eculab/**"
       - "app/src/test/java/com/example/ui/screens/EcuLabScreenTest.kt"
       - ".github/workflows/ecu-lab-android-tests.yml"
