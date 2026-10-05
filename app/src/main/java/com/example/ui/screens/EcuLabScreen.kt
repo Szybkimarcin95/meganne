@@ -298,10 +298,15 @@ private fun CounterBadge(label: String, count: Int, color: Color, tag: String) {
             .background(color.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
             .border(1.dp, color.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
             .padding(horizontal = 8.dp, vertical = 5.dp)
-            .testTag(tag)
     ) {
         Text(label, color = color, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-        Text(count.toString(), color = TextPrimary, fontWeight = FontWeight.Black, fontSize = 14.sp)
+        Text(
+            count.toString(),
+            color = TextPrimary,
+            fontWeight = FontWeight.Black,
+            fontSize = 14.sp,
+            modifier = Modifier.testTag(tag)
+        )
     }
 }
 
