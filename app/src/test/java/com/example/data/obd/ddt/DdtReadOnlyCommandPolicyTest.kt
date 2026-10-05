@@ -46,6 +46,38 @@ class DdtReadOnlyCommandPolicyTest {
     }
 
     @Test
+    fun hardBlocksActualSid307ClearDiagnosticsAndRoutineStopServices() {
+        val policy = DdtReadOnlyCommandPolicy(
+            descriptor = targetDescriptor().copy(
+                capabilities = targetDescriptor().capabilities + listOf(
+                    DdtCapability(
+                        requestName = "ClearDiagnosticInformation.All",
+                        sentBytes = "14FFFFFF",
+                        replyBytes = "54",
+                        operationClass = DdtOperationClass.RESET,
+                        manualSend = false,
+                        inputDataNames = emptyList(),
+                        outputDataNames = emptyList()
+                    ),
+                    DdtCapability(
+                        requestName = "StopRoutineByLocalIdentifier",
+                        sentBytes = "320000",
+                        replyBytes = "720000",
+                        operationClass = DdtOperationClass.ACTUATOR_TEST,
+                        manualSend = true,
+                        inputDataNames = listOf("RoutineExitOption", "RoutineLocalIdentifierStop"),
+                        outputDataNames = listOf("RoutineExitStatus")
+                    )
+                )
+            ),
+            physicalIdentity = MeganeSid307Target.physicalIdentity
+        )
+
+        assertTrue(policy.validate("14FFFFFF") is DdtReadValidationResult.Blocked)
+        assertTrue(policy.validate("320000") is DdtReadValidationResult.Blocked)
+    }
+
+    @Test
     fun blocksReadWhenPhysicalTransportDoesNotMatchDefinition() {
         val wrongTransport = MeganeSid307Target.physicalIdentity.copy(
             receiveCanId = "7E9"
