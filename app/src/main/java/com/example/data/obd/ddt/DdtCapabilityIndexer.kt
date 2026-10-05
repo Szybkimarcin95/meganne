@@ -37,7 +37,17 @@ class DdtCapabilityIndexer(
 
         val obd = root["obd"].asStringMap()
         val requests = root["requests"] as? List<*> ?: emptyList<Any?>()
-        val autoidents = root["autoidents"] as? List<*> ?: emptyList<Any?>()
+        val autoidents = (root["autoidents"] as? List<*>)
+            .orEmpty()
+            .mapNotNull { raw ->
+                val ident = raw.asStringMap() ?: return@mapNotNull null
+                DdtAutoIdent(
+                    diagnosticVersion = ident["diagversion"].asIdentityString(),
+                    supplier = ident["supplier"].asIdentityString(),
+                    software = ident["soft"].asIdentityString(),
+                    version = ident["version"].asIdentityString()
+                )
+            }
 
         val capabilities = requests.mapNotNull { raw ->
             val req = raw.asStringMap() ?: return@mapNotNull null
@@ -61,12 +71,12 @@ class DdtCapabilityIndexer(
         return DdtEcuDescriptor(
             ecuName = root["ecuname"] as? String,
             protocol = obd?.get("protocol") as? String,
-            sendId = obd?.get("send_id") as? String,
-            receiveId = obd?.get("recv_id") as? String,
-            functionalAddress = obd?.get("funcaddr") as? String,
+            sendId = obd?.get("send_id").asIdentityString(),
+            receiveId = obd?.get("recv_id").asIdentityString(),
+            functionalAddress = obd?.get("funcaddr").asIdentityString(),
             baudRate = (obd?.get("baudrate") as? Number)?.toInt(),
             endianness = root["endian"] as? String,
-            autoIdentCount = autoidents.size,
+            autoIdents = autoidents,
             capabilities = capabilities,
             sourceFile = sourceFile,
             vehicleMatchConfirmed = false
@@ -81,19 +91,11 @@ class DdtCapabilityIndexer(
         val upperName = requestName.uppercase(Locale.ROOT)
 
         return when (service) {
-            // Diagnostic/session state, but not persistent configuration.
             "10", "3E" -> DdtOperationClass.SESSION_CONTROL
-
-            // Security access must never be treated as an ordinary read.
             "27" -> DdtOperationClass.SECURITY_ACCESS
-
-            // Reset.
             "11" -> DdtOperationClass.RESET
-
-            // Input/output control / actuator routines.
             "2F", "30", "31" -> DdtOperationClass.ACTUATOR_TEST
 
-            // Persistent writes / programming.
             "2E" -> {
                 if (
                     upperName.contains("CONFIG") ||
@@ -102,9 +104,8 @@ class DdtCapabilityIndexer(
                     upperName.contains("OPTION")
                 ) DdtOperationClass.CONFIGURATION else DdtOperationClass.WRITE
             }
-            "3D", "34", "36", "37" -> DdtOperationClass.WRITE
 
-            // Read-oriented services seen in OBD/UDS/KWP contexts.
+            "3D", "34", "36", "37" -> DdtOperationClass.WRITE
             "01", "02", "03", "07", "09", "19", "1A", "21", "22", "23" -> DdtOperationClass.READ
 
             else -> {
@@ -126,7 +127,6 @@ class DdtCapabilityIndexer(
                         upperName.contains("ERASE") -> DdtOperationClass.WRITE
 
                     upperName.contains("RESET") -> DdtOperationClass.RESET
-
                     else -> DdtOperationClass.UNKNOWN
                 }
             }
@@ -138,6 +138,14 @@ class DdtCapabilityIndexer(
             .replace("\n", "")
             .replace("\r", "")
             .uppercase(Locale.ROOT)
+
+    private fun Any?.asIdentityString(): String? =
+        when (this) {
+            null -> null
+            is String -> trim().takeIf { it.isNotEmpty() }
+            is Number -> toString()
+            else -> toString().trim().takeIf { it.isNotEmpty() }
+        }
 
     @Suppress("UNCHECKED_CAST")
     private fun Any?.asStringMap(): Map<String, Any?>? =
