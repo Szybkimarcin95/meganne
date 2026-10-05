@@ -12,6 +12,13 @@ enum class EcuLabSort {
     REQUEST, NAME, STATUS, VALUE_ASC, VALUE_DESC
 }
 
+data class EcuDecodedValue(
+    val name: String,
+    val value: Any?,
+    val unit: String? = null,
+    val rawHex: String? = null
+)
+
 data class EcuReadResult(
     val requestHex: String,
     val name: String,
@@ -22,6 +29,7 @@ data class EcuReadResult(
     val raw: String? = null,
     val physicalValue: Any? = null,
     val unit: String? = null,
+    val decodedValues: List<EcuDecodedValue> = emptyList(),
     val sourceFile: String = "SID307_00F7_550_V05_20130313T104520.xml",
     val sourceLine: Int,
     val requiredSession: String? = null
@@ -54,18 +62,20 @@ data class EcuLabUiState(
     val counters: EcuLabCounters
         get() {
             val grouped = results.groupingBy { it.status }.eachCount()
-            val processed = results.size.coerceAtMost(totalRequests)
+            val terminalCount = results.count { it.status != EcuLabStatus.NOT_TESTED }
+                .coerceAtMost(totalRequests)
             return EcuLabCounters(
                 supported = grouped[EcuLabStatus.SUPPORTED] ?: 0,
                 nrc = grouped[EcuLabStatus.NRC] ?: 0,
                 timeout = grouped[EcuLabStatus.TIMEOUT] ?: 0,
                 sessionRequired = grouped[EcuLabStatus.SESSION_REQUIRED] ?: 0,
-                notTested = (totalRequests - processed).coerceAtLeast(0),
+                notTested = (totalRequests - terminalCount).coerceAtLeast(0),
                 cancelled = grouped[EcuLabStatus.CANCELLED] ?: 0
             )
         }
 
-    val completedCount: Int get() = results.size.coerceAtMost(totalRequests)
+    val completedCount: Int
+        get() = results.count { it.status != EcuLabStatus.NOT_TESTED }.coerceAtMost(totalRequests)
     val progressFraction: Float
         get() = if (totalRequests <= 0) 0f else completedCount.toFloat() / totalRequests.toFloat()
 
