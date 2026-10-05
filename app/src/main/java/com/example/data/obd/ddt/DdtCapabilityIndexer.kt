@@ -96,8 +96,8 @@ class DdtCapabilityIndexer(
         return when (service) {
             "10", "3E" -> DdtOperationClass.SESSION_CONTROL
             "27" -> DdtOperationClass.SECURITY_ACCESS
-            "11" -> DdtOperationClass.RESET
-            "2F", "30", "31" -> DdtOperationClass.ACTUATOR_TEST
+            "11", "14" -> DdtOperationClass.RESET
+            "2F", "30", "31", "32" -> DdtOperationClass.ACTUATOR_TEST
 
             "2E" -> {
                 if (
