@@ -77,6 +77,27 @@ class DdtReadOnlyCommandPolicyTest {
         assertTrue(policy.validate("320000") is DdtReadValidationResult.Blocked)
     }
 
+
+    @Test
+    fun hardBlocksDiagnosticSessionControlInReadOnlyRuntime() {
+        val policy = DdtReadOnlyCommandPolicy(
+            descriptor = targetDescriptor().copy(
+                capabilities = targetDescriptor().capabilities + DdtCapability(
+                    requestName = "StartDiagnosticSession.ExtendedDiagnostic",
+                    sentBytes = "10C0",
+                    replyBytes = "50C0",
+                    operationClass = DdtOperationClass.READ,
+                    manualSend = true,
+                    inputDataNames = emptyList(),
+                    outputDataNames = emptyList()
+                )
+            ),
+            physicalIdentity = MeganeSid307Target.physicalIdentity
+        )
+
+        assertTrue(policy.validate("10C0") is DdtReadValidationResult.Blocked)
+    }
+
     @Test
     fun blocksReadWhenPhysicalTransportDoesNotMatchDefinition() {
         val wrongTransport = MeganeSid307Target.physicalIdentity.copy(

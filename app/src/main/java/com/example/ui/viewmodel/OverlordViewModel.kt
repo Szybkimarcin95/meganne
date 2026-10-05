@@ -23,6 +23,12 @@ import com.example.data.obd.DataVerificationStatus
 import com.example.data.obd.ObdConnectionState
 import com.example.data.obd.ObdManager
 import com.example.data.repository.OverlordRepository
+import com.example.ui.eculab.EcuLabEvent
+import com.example.ui.eculab.EcuLabServiceFilter
+import com.example.ui.eculab.EcuLabSort
+import com.example.ui.eculab.EcuLabStatus
+import com.example.ui.eculab.EcuLabUiState
+import com.example.ui.eculab.reduceEcuLabEvent
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -33,6 +39,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -325,6 +332,49 @@ class OverlordViewModel(application: Application) : AndroidViewModel(application
 
     fun selectTab(tab: OverlordTab) {
         _currentTab.value = tab
+    }
+
+    // ECU Lab UI state. This is presentation-only until a separately approved
+    // transport bridge connects the READ-only scheduler to the Android app.
+    private val _ecuLabUiState = MutableStateFlow(EcuLabUiState())
+    val ecuLabUiState: StateFlow<EcuLabUiState> = _ecuLabUiState.asStateFlow()
+
+    fun onEcuLabEvent(event: EcuLabEvent) {
+        _ecuLabUiState.update { reduceEcuLabEvent(it, event) }
+    }
+
+    fun setEcuLabQuery(query: String) {
+        _ecuLabUiState.update { it.copy(query = query) }
+    }
+
+    fun setEcuLabStatusFilter(status: EcuLabStatus?) {
+        _ecuLabUiState.update { it.copy(statusFilter = status) }
+    }
+
+    fun setEcuLabServiceFilter(filter: EcuLabServiceFilter) {
+        _ecuLabUiState.update { it.copy(serviceFilter = filter) }
+    }
+
+    fun setEcuLabGroupBySession(enabled: Boolean) {
+        _ecuLabUiState.update { it.copy(groupBySession = enabled) }
+    }
+
+    fun setEcuLabSort(sort: EcuLabSort) {
+        _ecuLabUiState.update { it.copy(sort = sort) }
+    }
+
+    fun requestEcuLabCancel() {
+        _ecuLabUiState.update {
+            if (!it.isScanning) it else it.copy(cancelRequested = true)
+        }
+    }
+
+    fun notifyEcuLabExport(success: Boolean) {
+        _quickActionStatus.value = if (success) {
+            "ECU Lab: zapisano raport JSON"
+        } else {
+            "ECU Lab: nie udało się zapisać raportu JSON"
+        }
     }
 
     // Telemetry & OBD

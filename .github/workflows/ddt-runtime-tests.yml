@@ -1,0 +1,32 @@
+name: DDT Runtime Tests
+
+on:
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "tools/ddt/**"
+      - "app/src/main/java/com/example/data/obd/ddt/DdtReadOnlyCommandPolicy.kt"
+      - "app/src/test/java/com/example/data/obd/ddt/DdtReadOnlyCommandPolicyTest.kt"
+      - ".github/workflows/ddt-runtime-tests.yml"
+  push:
+    branches: [ "main" ]
+    paths:
+      - "tools/ddt/**"
+      - ".github/workflows/ddt-runtime-tests.yml"
+
+jobs:
+  runtime-decoder:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Run DDT runtime tests
+        run: python -m unittest discover -s tools/ddt -p 'test_*.py' -v

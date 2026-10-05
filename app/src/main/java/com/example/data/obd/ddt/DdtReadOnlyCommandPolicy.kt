@@ -95,6 +95,7 @@ class DdtReadOnlyCommandPolicy(
 
     private companion object {
         val HARD_BLOCKED_SERVICES = setOf(
+            "10", // DiagnosticSessionControl - not permitted in PR #6 READ runtime
             "11", // ECUReset
             "14", // ClearDiagnosticInformation
             "27", // SecurityAccess

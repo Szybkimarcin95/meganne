@@ -31,7 +31,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -66,13 +66,14 @@ fun ArsenalScreen(
     viewModel: OverlordViewModel,
     modifier: Modifier = Modifier
 ) {
-    var selectedSubTab by remember { mutableIntStateOf(0) } // 0 = Poradniki DIY, 1 = Momenty Dokręcania
+    var selectedSubTab by remember { mutableIntStateOf(0) } // 0 = DIY, 1 = Torque, 2 = ECU Lab
 
     val repairGuides = viewModel.repairGuides
     val selectedGuide by viewModel.selectedGuide.collectAsStateWithLifecycle()
 
     val torqueSpecs by viewModel.filteredTorqueSpecs.collectAsStateWithLifecycle()
     val torqueSearch by viewModel.torqueSearch.collectAsStateWithLifecycle()
+    val ecuLabUiState by viewModel.ecuLabUiState.collectAsStateWithLifecycle()
 
     Column(
         modifier = modifier
@@ -81,8 +82,9 @@ fun ArsenalScreen(
     ) {
         Spacer(modifier = Modifier.height(4.dp))
 
-        TabRow(
+        ScrollableTabRow(
             selectedTabIndex = selectedSubTab,
+            edgePadding = 0.dp,
             containerColor = CockpitSurface,
             contentColor = CyanHud,
             modifier = Modifier
@@ -99,11 +101,17 @@ fun ArsenalScreen(
                 onClick = { selectedSubTab = 1 },
                 text = { Text("Momenty Śrub (Nm)", fontWeight = FontWeight.Bold) }
             )
+            Tab(
+                selected = selectedSubTab == 2,
+                onClick = { selectedSubTab = 2 },
+                text = { Text("ECU Lab", fontWeight = FontWeight.Bold) }
+            )
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        if (selectedSubTab == 0) {
+        when (selectedSubTab) {
+            0 -> {
             // Repair Guides
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -182,8 +190,9 @@ fun ArsenalScreen(
 
                 item { Spacer(modifier = Modifier.height(16.dp)) }
             }
-        } else {
-            // Torque Specs
+            }
+            1 -> {
+                // Torque Specs
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxSize()
@@ -252,6 +261,17 @@ fun ArsenalScreen(
 
                 item { Spacer(modifier = Modifier.height(16.dp)) }
             }
+            }
+            else -> EcuLabScreen(
+                state = ecuLabUiState,
+                onQueryChange = viewModel::setEcuLabQuery,
+                onStatusFilterChange = viewModel::setEcuLabStatusFilter,
+                onServiceFilterChange = viewModel::setEcuLabServiceFilter,
+                onGroupBySessionChange = viewModel::setEcuLabGroupBySession,
+                onSortChange = viewModel::setEcuLabSort,
+                onCancelScan = viewModel::requestEcuLabCancel,
+                onExportFinished = viewModel::notifyEcuLabExport
+            )
         }
     }
 
