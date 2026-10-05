@@ -77,7 +77,7 @@ class DdtCapabilityIndexerTest {
     }
 
     @Test
-    fun exactMeganeSid307AutoIdentCanBeConfirmedWithoutUnlockingCommands() {
+    fun exactMeganeSid307AutoIdentAndTransportCanBeConfirmedWithoutUnlockingCommands() {
         val json = """
             {
               "autoidents": [
@@ -102,22 +102,48 @@ class DdtCapabilityIndexerTest {
             "SID307_00F7_550_V05_20130313T104520.json"
         )
 
-        val physical = PhysicalEcuIdentity(
-            diagnosticVersion = "129",
-            supplier = "4BE",
-            software = "00F7",
-            version = "5500",
-            receiveCanId = "7E8"
-        )
-
         val matcher = DdtVehicleMatcher()
-        val match = matcher.match(descriptor, physical)
-        val confirmed = matcher.confirmVehicleMatch(descriptor, physical)
+        val match = matcher.match(descriptor, MeganeSid307Target.physicalIdentity)
+        val confirmed = matcher.confirmVehicleMatch(descriptor, MeganeSid307Target.physicalIdentity)
 
         assertEquals(DdtVehicleMatchStatus.EXACT_AUTOIDENT_MATCH, match.status)
-        assertEquals(setOf("diagversion", "supplier", "soft", "version"), match.matchedFields)
+        assertEquals(
+            setOf("diagversion", "supplier", "soft", "version", "recv_id", "protocol", "baudrate"),
+            match.matchedFields
+        )
         assertTrue(confirmed.vehicleMatchConfirmed)
         assertFalse(confirmed.capabilities.any { it.executable })
+    }
+
+    @Test
+    fun exactAutoIdentWithWrongCanTransportIsRejected() {
+        val descriptor = DdtEcuDescriptor(
+            ecuName = "SID307_WRONG_TRANSPORT",
+            protocol = "CAN",
+            sendId = "7E0",
+            receiveId = "7E9",
+            functionalAddress = "10",
+            baudRate = 250000,
+            endianness = "Big",
+            autoIdents = listOf(
+                DdtAutoIdent(
+                    diagnosticVersion = "129",
+                    supplier = "4BE",
+                    software = "00F7",
+                    version = "5500"
+                )
+            ),
+            capabilities = emptyList(),
+            sourceFile = "SID307_WRONG_TRANSPORT.json"
+        )
+
+        val match = DdtVehicleMatcher().match(
+            descriptor,
+            MeganeSid307Target.physicalIdentity
+        )
+
+        assertEquals(DdtVehicleMatchStatus.TRANSPORT_MISMATCH, match.status)
+        assertEquals(setOf("recv_id", "baudrate"), match.mismatchedFields)
     }
 
     @Test
