@@ -26,5 +26,5 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Run DDT runtime decoder tests
-        run: python -m unittest tools.ddt.test_runtime_decoder -v
+      - name: Run DDT runtime tests
+        run: python -m unittest discover -s tools/ddt -p 'test_*.py' -v
