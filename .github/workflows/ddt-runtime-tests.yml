@@ -5,6 +5,8 @@ on:
     branches: [ "main" ]
     paths:
       - "tools/ddt/**"
+      - "app/src/main/java/com/example/data/obd/ddt/DdtReadOnlyCommandPolicy.kt"
+      - "app/src/test/java/com/example/data/obd/ddt/DdtReadOnlyCommandPolicyTest.kt"
       - ".github/workflows/ddt-runtime-tests.yml"
   push:
     branches: [ "main" ]
