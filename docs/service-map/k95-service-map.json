@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "vehicle": {
+    "platform": "X95",
+    "body": "K95",
+    "engine": "K9K636",
+    "trim": "Bose"
+  },
+  "nodes": [
+    {
+      "id": "1917",
+      "type": "module",
+      "name": "Audio Amplifier",
+      "status": "DATABASE_VERIFIED"
+    },
+    {
+      "id": "1987",
+      "type": "component",
+      "name": "Woofer",
+      "status": "DATABASE_VERIFIED"
+    },
+    {
+      "id": "R2",
+      "type": "connector",
+      "name": "Dashboard / Left Rear Connection",
+      "status": "DATABASE_VERIFIED"
+    },
+    {
+      "id": "R372",
+      "type": "connector",
+      "name": "Rear / Fascia Band Connection",
+      "status": "DATABASE_VERIFIED"
+    },
+    {
+      "id": "1778",
+      "type": "component",
+      "name": "Rear Camera",
+      "status": "DATABASE_VERIFIED"
+    }
+  ],
+  "circuits": [
+    {
+      "id": "34MX",
+      "from": "1917:6",
+      "to": "1987:1",
+      "function": "woofer +",
+      "section_mm2": 2.5,
+      "sourceStatus": "DATABASE_VERIFIED"
+    },
+    {
+      "id": "34MY",
+      "from": "1917:2",
+      "to": "1987:2",
+      "function": "woofer -",
+      "section_mm2": 2.5,
+      "sourceStatus": "DATABASE_VERIFIED"
+    },
+    {
+      "id": "TB34",
+      "path": [
+        "R2:A8",
+        "R372:1"
+      ],
+      "function": "rear camera shield",
+      "section_mm2": 0.35,
+      "sourceStatus": "DATABASE_VERIFIED"
+    },
+    {
+      "id": "34KL",
+      "path": [
+        "R2:A9",
+        "R372:2"
+      ],
+      "function": "rear camera video",
+      "section_mm2": 0.35,
+      "sourceStatus": "DATABASE_VERIFIED"
+    },
+    {
+      "id": "34KK",
+      "path": [
+        "R2:A10",
+        "R372:4"
+      ],
+      "function": "rear camera +",
+      "section_mm2": 0.35,
+      "sourceStatus": "DATABASE_VERIFIED"
+    },
+    {
+      "id": "34KJ",
+      "path": [
+        "R2:A11",
+        "R372:3"
+      ],
+      "function": "rear camera -",
+      "section_mm2": 0.35,
+      "sourceStatus": "DATABASE_VERIFIED"
+    }
+  ],
+  "vehicleEvidence": {
+    "boseAmpLabel": "28063 9878R",
+    "wooferCableRoute": "behind glovebox/amplifier zone -> under dash/right side -> 2-pin connector -> short lead -> woofer",
+    "seatRailRoute": false,
+    "wooferResistanceObservation": "OL normally; unstable 0.8..0.1 ohm appeared when metal basket was contacted/pressed; unresolved",
+    "corrodedConnectorIdentity": "UNVERIFIED"
+  }
+}
