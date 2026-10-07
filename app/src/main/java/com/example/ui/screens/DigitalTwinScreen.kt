@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.EngineComponent
 import com.example.data.model.FuseItem
+import com.example.data.model.K95ServiceMap
 import com.example.ui.components.SensorTrendCard
 import com.example.ui.theme.AmberBose
 import com.example.ui.theme.CockpitBackground
@@ -91,7 +92,7 @@ fun DigitalTwinScreen(
     viewModel: OverlordViewModel,
     modifier: Modifier = Modifier
 ) {
-    var selectedSubTab by remember { mutableIntStateOf(0) } // 0 = Bezpieczniki, 1 = Komora K9K, 2 = Trendy
+    var selectedSubTab by remember { mutableIntStateOf(0) } // 0 = Bezpieczniki, 1 = Komora K9K, 2 = Instalacja K95, 3 = Trendy
 
     val fuses by viewModel.filteredFuses.collectAsStateWithLifecycle()
     val selectedFuse by viewModel.selectedFuse.collectAsStateWithLifecycle()
@@ -100,6 +101,7 @@ fun DigitalTwinScreen(
 
     val engineComponents = viewModel.engineComponents
     val selectedEngineComponent by viewModel.selectedEngineComponent.collectAsStateWithLifecycle()
+    val serviceMap by viewModel.k95ServiceMap.collectAsStateWithLifecycle()
 
     Column(
         modifier = modifier
@@ -130,6 +132,11 @@ fun DigitalTwinScreen(
             Tab(
                 selected = selectedSubTab == 2,
                 onClick = { selectedSubTab = 2 },
+                text = { Text("Instalacja K95", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+            )
+            Tab(
+                selected = selectedSubTab == 3,
+                onClick = { selectedSubTab = 3 },
                 text = { Text("Trendy Sensorów", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
             )
         }
@@ -154,6 +161,9 @@ fun DigitalTwinScreen(
                     components = engineComponents,
                     onComponentClick = { viewModel.selectEngineComponent(it) }
                 )
+            }
+            2 -> {
+                K95ServiceMapView(serviceMap = serviceMap)
             }
             else -> {
                 // Sensor Trends View
@@ -763,5 +773,181 @@ fun SensorTrendsView(
         item {
             Spacer(modifier = Modifier.height(16.dp))
         }
+    }
+}
+
+
+@Composable
+fun K95ServiceMapView(
+    serviceMap: K95ServiceMap?
+) {
+    if (serviceMap == null) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = CockpitSurface),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Instalacja K95", color = TextPrimary, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    "Nie udało się wczytać assets/service-map/k95-service-map.json.",
+                    color = WarningRed,
+                    fontSize = 12.sp
+                )
+            }
+        }
+        return
+    }
+
+    LazyColumn(
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.fillMaxSize()
+    ) {
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = CockpitSurface),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(
+                        "Instalacja K95 • BOSE / kamera",
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(serviceMap.vehicle, color = TextSecondary, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        "Źródło: ${serviceMap.verificationStatus}",
+                        color = if (serviceMap.verificationStatus == "DATABASE_VERIFIED") DiagnosticGreen else AmberBose,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        item {
+            Text(
+                "KOMPONENTY",
+                color = CyanHud,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp
+            )
+        }
+
+        items(serviceMap.components) { component ->
+            Card(
+                colors = CardDefaults.cardColors(containerColor = CockpitSurface),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            "${component.id} • ${component.name}",
+                            color = TextPrimary,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            component.verificationStatus,
+                            color = if (component.verificationStatus == "DATABASE_VERIFIED") DiagnosticGreen else AmberBose,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 9.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(component.location, color = AmberBose, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(component.notes, color = TextSecondary, fontSize = 12.sp)
+                }
+            }
+        }
+
+        item {
+            Text(
+                "OBWODY",
+                color = CyanHud,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp
+            )
+        }
+
+        items(serviceMap.circuits) { circuit ->
+            Card(
+                colors = CardDefaults.cardColors(containerColor = CockpitSurface),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(
+                        "${circuit.code}  ${circuit.polarity}",
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "${circuit.from} pin ${circuit.fromPin} → ${circuit.to} pin ${circuit.toPin}",
+                        color = TextSecondary,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 12.sp
+                    )
+                    Text(
+                        "${circuit.gaugeMm2} mm² • ${circuit.verificationStatus}",
+                        color = if (circuit.verificationStatus == "DATABASE_VERIFIED") DiagnosticGreen else AmberBose,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+        }
+
+        item {
+            Text(
+                "ZŁĄCZA",
+                color = CyanHud,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp
+            )
+        }
+
+        items(serviceMap.connectors) { connector ->
+            Card(
+                colors = CardDefaults.cardColors(containerColor = CockpitSurface),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            "${connector.id} • ${connector.name}",
+                            color = TextPrimary,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            connector.verificationStatus,
+                            color = if (connector.verificationStatus == "DATABASE_VERIFIED") DiagnosticGreen else AmberBose,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 9.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        connector.pins.joinToString("  |  "),
+                        color = TextSecondary,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(connector.notes, color = TextSecondary, fontSize = 12.sp)
+                }
+            }
+        }
+
+        item { Spacer(modifier = Modifier.height(16.dp)) }
     }
 }
