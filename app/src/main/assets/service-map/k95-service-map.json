@@ -1,0 +1,58 @@
+{
+  "vehicle": "Renault Megane III Grandtour Bose 1.5 dCi K9K 636 / K95",
+  "verificationStatus": "DATABASE_VERIFIED",
+  "components": [
+    {
+      "id": "1917",
+      "name": "BOSE audio amplifier",
+      "location": "behind passenger glovebox / right side of dashboard",
+      "verificationStatus": "DATABASE_VERIFIED",
+      "notes": "Amplifier label previously identified as Renault 280639878R. This entry represents the BOSE amplifier module."
+    },
+    {
+      "id": "1987",
+      "name": "BOSE subwoofer",
+      "location": "passenger-side floor area",
+      "verificationStatus": "DATABASE_VERIFIED",
+      "notes": "Passive two-wire woofer circuit fed from amplifier 1917."
+    }
+  ],
+  "circuits": [
+    {
+      "code": "34MX",
+      "from": "1917",
+      "fromPin": "6",
+      "to": "1987",
+      "toPin": "1",
+      "gaugeMm2": 2.5,
+      "polarity": "+",
+      "verificationStatus": "DATABASE_VERIFIED"
+    },
+    {
+      "code": "34MY",
+      "from": "1917",
+      "fromPin": "2",
+      "to": "1987",
+      "toPin": "2",
+      "gaugeMm2": 2.5,
+      "polarity": "-",
+      "verificationStatus": "DATABASE_VERIFIED"
+    }
+  ],
+  "connectors": [
+    {
+      "id": "R2",
+      "name": "Dashboard / left rear interconnection",
+      "pins": ["A8 TB34", "A9 34KL", "A10 34KK", "A11 34KJ"],
+      "verificationStatus": "UNVERIFIED",
+      "notes": "Camera-related circuit data exists, but the heavily corroded physical connector seen in photos has not been numerically proven to be R2."
+    },
+    {
+      "id": "R372",
+      "name": "Rear / fascia camera connector",
+      "pins": ["1 TB34", "2 34KL", "3 34KJ", "4 34KK"],
+      "verificationStatus": "DATABASE_VERIFIED",
+      "notes": "Rear camera circuit mapping from prior service documentation."
+    }
+  ]
+}
