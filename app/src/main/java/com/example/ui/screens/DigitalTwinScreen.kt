@@ -828,6 +828,8 @@ fun K95ServiceMapView(
             }
         }
 
+        item { BoseAudioDiagnosticScreen(serviceMap) }
+
         item {
             Text(
                 "KOMPONENTY",

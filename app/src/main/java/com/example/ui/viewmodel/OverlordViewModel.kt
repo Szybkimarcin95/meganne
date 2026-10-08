@@ -54,7 +54,8 @@ enum class OverlordTab(val title: String) {
     DIGITAL_TWIN("Cyfrowy Bliźniak"),
     ORACLE("Wyrocznia OBD"),
     BLACK_BOX("Czarna Skrzynka"),
-    ARSENAL("Arsenał")
+    ARSENAL("Arsenał"),
+    MULTI_ECU("Sterowniki")
 }
 
 internal fun findDtcByCatalogAlias(dtcDatabase: List<DtcCode>, ecuCode: String): DtcCode? {
