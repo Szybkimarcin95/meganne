@@ -15,7 +15,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@Config(sdk = [35])
 class K95EcuPersistenceTest {
     private fun fixture() = K95Ecu(
         id = "TEST_FIXTURE", commonName = "Sterownik • żółć", status = K95EcuStatus.CONFIRMED_IN_CAR,
