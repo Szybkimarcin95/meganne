@@ -1,6 +1,10 @@
 package com.example.ui.viewmodel
 
 import android.app.Application
+import com.example.data.local.AppDatabase
+import com.example.data.repository.K95EcuRepository
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.catch
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.model.K95Ecu
@@ -25,7 +29,18 @@ class MultiEcuViewModel(application: Application) : AndroidViewModel(application
 
     private var loadStarted = false
 
-    init { reloadSources() }
+    private val repository = K95EcuRepository(AppDatabase.getInstance(application).k95EcuDao())
+
+    init {
+        viewModelScope.launch {
+            repository.inventory.catch { e ->
+                if (e is CancellationException) throw e
+                _state.value = _state.value.copy(loading = false,
+                    messages = _state.value.messages + "DATABASE ERROR: ${e.javaClass.simpleName}")
+            }.collect { ecus -> _state.value = _state.value.copy(ecus = ecus) }
+        }
+        reloadSources()
+    }
 
     fun reloadSources() {
         if (_state.value.loading && loadStarted) return
@@ -56,7 +71,14 @@ class MultiEcuViewModel(application: Application) : AndroidViewModel(application
                     loading = false, messages = messages
                 )
             }
-            _state.value = result
+            try {
+                repository.importCandidates(result.ecus)
+                _state.value = _state.value.copy(loading = false, messages = result.messages)
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                _state.value = _state.value.copy(loading = false,
+                    messages = result.messages + "DATABASE ERROR: ${e.javaClass.simpleName}")
+            }
         }
     }
 

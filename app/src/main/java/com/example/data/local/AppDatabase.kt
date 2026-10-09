@@ -18,9 +18,10 @@ import com.example.data.model.TelemetryLog
         FuelRecord::class,
         TelemetryLog::class,
         SensorTrendEntity::class,
-        DiagnosticFaultHistoryEntity::class
+        DiagnosticFaultHistoryEntity::class,
+        K95EcuEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -30,7 +31,31 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun sensorTrendDao(): SensorTrendDao
     abstract fun diagnosticFaultHistoryDao(): DiagnosticFaultHistoryDao
 
+    abstract fun k95EcuDao(): K95EcuDao
+
     companion object {
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `k95_ecu` (
+                        `id` TEXT NOT NULL PRIMARY KEY,
+                        `commonName` TEXT NOT NULL,
+                        `status` TEXT NOT NULL,
+                        `diagnosticAddress` TEXT,
+                        `responseAddress` TEXT,
+                        `canSpeed` INTEGER,
+                        `lastSeen` INTEGER,
+                        `physicalLocation` TEXT,
+                        `notes` TEXT NOT NULL,
+                        `ddtMatchesJson` TEXT NOT NULL,
+                        `identifiersJson` TEXT NOT NULL,
+                        `serviceMapNodeIdsJson` TEXT NOT NULL,
+                        `sourcesJson` TEXT NOT NULL
+                    )
+                """.trimIndent())
+            }
+        }
+
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -72,8 +97,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "megane_overlord_db"
                 )
-                .addMigrations(MIGRATION_2_3)
-                .fallbackToDestructiveMigration()
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
                 .build()
                 INSTANCE = instance
                 instance
