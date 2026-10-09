@@ -27,6 +27,7 @@ on:
       - "app/src/test/java/com/example/ui/eculab/**"
       - "app/src/test/java/com/example/ui/screens/EcuLabScreenTest.kt"
       - ".github/workflows/ecu-lab-android-tests.yml"
+      - ".github/workflows/codeql.yml"
 
 jobs:
   ecu-lab-tests:
