@@ -46,9 +46,13 @@ sealed class DiagnosticExecutionResult {
  * 4. Response parsing: Handles fragmentation, timeouts, and adapter error codes (BUFFER FULL, NO DATA, etc.).
  * 5. Clean resource release: Mutex is guaranteed released on timeout, error, or coroutine cancellation.
  */
-class SafeDiagnosticSession(
-    private val transport: DiagnosticTransport
+class SafeDiagnosticSession internal constructor(
+    private val transport: DiagnosticTransport,
+    private val validateCommand: (String) -> CommandValidationResult
 ) {
+    /** Production entry point always uses the unchanged CommandFirewall. */
+    constructor(transport: DiagnosticTransport) : this(transport, CommandFirewall::validate)
+
     private val transactionMutex = Mutex()
     private val currentGeneration = AtomicLong(1)
 
@@ -87,7 +91,7 @@ class SafeDiagnosticSession(
         val expectedGeneration = currentGeneration.get()
 
         // Step 1: Pre-execution Command Firewall validation (Transport is NEVER touched if blocked)
-        val validation = CommandFirewall.validate(rawCommand)
+        val validation = validateCommand(rawCommand)
         if (validation is CommandValidationResult.Blocked) {
             return@withContext DiagnosticExecutionResult.BlockedByFirewall(
                 rawCommand = rawCommand,
@@ -250,7 +254,7 @@ class SafeDiagnosticSession(
         // Validate complete setup/read/restore plan BEFORE changing adapter state.
         val validated = mutableListOf<CommandValidationResult.Allowed>()
         for (command in setup + commands + restoreCommands) {
-            when (val validation = CommandFirewall.validate(command)) {
+            when (val validation = validateCommand(command)) {
                 is CommandValidationResult.Blocked -> return@withContext blocked(command, validation.reason)
                 is CommandValidationResult.Allowed -> validated += validation
             }
