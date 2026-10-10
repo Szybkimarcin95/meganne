@@ -12,6 +12,7 @@ import com.example.data.model.DtcSeverity
 import com.example.data.model.EngineComponent
 import com.example.data.model.FuelRecord
 import com.example.data.model.FuseItem
+import com.example.data.model.K95ServiceMap
 import com.example.data.model.HealthCheckItem
 import com.example.data.model.HealthCheckStatus
 import com.example.data.model.LiveTelemetry
@@ -22,6 +23,7 @@ import com.example.data.model.TorqueSpec
 import com.example.data.obd.DataVerificationStatus
 import com.example.data.obd.ObdConnectionState
 import com.example.data.obd.ObdManager
+import com.example.data.repository.K95ServiceMapRepository
 import com.example.data.repository.OverlordRepository
 import com.example.ui.eculab.EcuLabEvent
 import com.example.ui.eculab.EcuLabServiceFilter
@@ -52,7 +54,8 @@ enum class OverlordTab(val title: String) {
     DIGITAL_TWIN("Cyfrowy Bliźniak"),
     ORACLE("Wyrocznia OBD"),
     BLACK_BOX("Czarna Skrzynka"),
-    ARSENAL("Arsenał")
+    ARSENAL("Arsenał"),
+    MULTI_ECU("Sterowniki")
 }
 
 internal fun findDtcByCatalogAlias(dtcDatabase: List<DtcCode>, ecuCode: String): DtcCode? {
@@ -324,6 +327,7 @@ internal fun buildDiagnosticCheckReport(
 
 class OverlordViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = OverlordRepository(application)
+    private val k95ServiceMapRepository = K95ServiceMapRepository(application)
     private val obdManager = ObdManager(application)
 
     // Current navigation tab
@@ -386,6 +390,13 @@ class OverlordViewModel(application: Application) : AndroidViewModel(application
     val isLogging = obdManager.isLogging
 
     val vehicleProfile = MutableStateFlow(com.example.data.model.VehicleProfile())
+
+    private val _k95ServiceMap = MutableStateFlow<K95ServiceMap?>(k95ServiceMapRepository.load())
+    val k95ServiceMap: StateFlow<K95ServiceMap?> = _k95ServiceMap.asStateFlow()
+
+    fun refreshK95ServiceMap() {
+        _k95ServiceMap.value = k95ServiceMapRepository.load()
+    }
 
     init {
         obdManager.onTelemetryLogged = { pidResult ->

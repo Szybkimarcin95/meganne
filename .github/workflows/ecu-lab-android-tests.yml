@@ -5,6 +5,21 @@ on:
     branches: [ "main" ]
     paths:
       - "app/src/main/java/com/example/ui/eculab/**"
+      - "app/src/main/java/com/example/data/model/K95Ecu.kt"
+      - "app/src/main/java/com/example/data/local/**"
+      - "app/src/main/java/com/example/data/repository/K95EcuRepository.kt"
+      - "app/src/main/java/com/example/data/obd/SafeDiagnosticSession.kt"
+      - "app/src/main/java/com/example/data/obd/ddt/DdtDiscoveryCommandPolicy.kt"
+      - "app/src/test/java/com/example/data/obd/ddt/DdtDiscoveryCommandPolicyTest.kt"
+      - "app/src/test/java/com/example/data/local/**"
+      - "app/src/test/java/com/example/data/obd/AddressedTransactionTest.kt"
+      - "app/src/test/java/com/example/data/obd/SafeDiagnosticSessionAddressedTest.kt"
+      - "app/src/main/java/com/example/ui/viewmodel/MultiEcuViewModel.kt"
+      - "app/src/main/java/com/example/ui/screens/MultiEcuDashboard.kt"
+      - "app/src/main/java/com/example/ui/screens/BoseAudioDiagnosticScreen.kt"
+      - "app/src/main/java/com/example/ui/screens/DigitalTwinScreen.kt"
+      - "app/src/main/java/com/example/MainActivity.kt"
+      - "app/src/test/java/com/example/data/model/K95InventoryCatalogTest.kt"
       - "app/src/main/java/com/example/ui/screens/EcuLabScreen.kt"
       - "app/src/main/java/com/example/ui/screens/ArsenalScreen.kt"
       - "app/src/main/java/com/example/ui/viewmodel/OverlordViewModel.kt"
@@ -13,6 +28,7 @@ on:
       - "app/src/test/java/com/example/ui/eculab/**"
       - "app/src/test/java/com/example/ui/screens/EcuLabScreenTest.kt"
       - ".github/workflows/ecu-lab-android-tests.yml"
+      - ".github/workflows/codeql.yml"
 
 jobs:
   ecu-lab-tests:
@@ -48,7 +64,7 @@ jobs:
 
       - name: Run ECU Lab model tests
         run: |
-          gradle :app:testDebugUnitTest             --tests 'com.example.ui.eculab.EcuLabModelsTest'             --no-daemon             --stacktrace
+          gradle :app:testDebugUnitTest             --tests 'com.example.ui.eculab.EcuLabModelsTest' --tests 'com.example.data.model.K95InventoryCatalogTest' --tests 'com.example.data.local.K95EcuPersistenceTest' --tests 'com.example.data.local.RoomMigrationTest' --tests 'com.example.data.obd.AddressedTransactionTest' --tests 'com.example.data.obd.SafeDiagnosticSessionAddressedTest' --tests 'com.example.data.obd.ddt.DdtDiscoveryCommandPolicyTest' --tests 'com.example.data.obd.CommandFirewallAndSessionTest'             --no-daemon             --stacktrace
 
       - name: Run Compose/Robolectric smoke test
         continue-on-error: true

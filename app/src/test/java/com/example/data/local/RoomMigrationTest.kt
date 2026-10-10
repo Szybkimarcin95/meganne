@@ -17,7 +17,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@Config(sdk = [35])
 class RoomMigrationTest {
 
     private lateinit var context: Context
@@ -35,7 +35,7 @@ class RoomMigrationTest {
     }
 
     @Test
-    fun testMigrationFrom2To3PreservesExistingDataAndCreatesNewTables() {
+    fun testMigrationFrom2To4PreservesExistingDataAndCreatesNewTables() {
         // Step 1: Create v2 database schema manually with sample data
         val config = SupportSQLiteOpenHelper.Configuration.builder(context)
             .name(dbName)
@@ -122,17 +122,17 @@ class RoomMigrationTest {
         v2Db.close()
         helper.close()
 
-        // Step 2: Open database via Room with MIGRATION_2_3
+        // Step 2: Open database via Room with MIGRATION_2_3 and MIGRATION_3_4
         val migratedDb = Room.databaseBuilder(context, AppDatabase::class.java, dbName)
-            .addMigrations(AppDatabase.MIGRATION_2_3)
+            .addMigrations(AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4)
             .build()
 
         val roomDb = migratedDb.openHelper.writableDatabase
 
-        // Section 14: Check PRAGMA user_version = 3
+        // Section 14: Check PRAGMA user_version = 4
         cursor = roomDb.query("PRAGMA user_version")
         cursor.moveToFirst()
-        assertEquals(3, cursor.getInt(0))
+        assertEquals(4, cursor.getInt(0))
         cursor.close()
 
         // Section 12: Assertions for preserved v2 data

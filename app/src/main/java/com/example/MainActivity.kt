@@ -61,6 +61,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.model.VehicleSpec
 import com.example.data.obd.ObdConnectionState
 import com.example.ui.components.DiagnosticFloatingActionMenu
+import com.example.ui.screens.MultiEcuDashboard
 import com.example.ui.screens.ArsenalScreen
 import com.example.ui.screens.BlackBoxScreen
 import com.example.ui.screens.DashboardScreen
@@ -268,6 +269,13 @@ fun OverlordApp(viewModel: OverlordViewModel = viewModel()) {
                 )
 
                 NavigationBarItem(
+                    selected = currentTab == OverlordTab.MULTI_ECU,
+                    onClick = { viewModel.selectTab(OverlordTab.MULTI_ECU) },
+                    icon = { Icon(Icons.Default.Info, contentDescription = "Sterowniki ECU") },
+                    label = { Text("ECU", fontSize = 10.sp) },
+                    modifier = Modifier.testTag("tab_multi_ecu")
+                )
+                NavigationBarItem(
                     selected = currentTab == OverlordTab.ARSENAL,
                     onClick = { viewModel.selectTab(OverlordTab.ARSENAL) },
                     icon = { Icon(Icons.Default.Build, contentDescription = "Arsenał") },
@@ -331,6 +339,7 @@ fun OverlordApp(viewModel: OverlordViewModel = viewModel()) {
         modifier = Modifier.fillMaxSize()
     ) { innerPadding ->
         when (currentTab) {
+            OverlordTab.MULTI_ECU -> MultiEcuDashboard(modifier = Modifier.padding(innerPadding))
             OverlordTab.DASHBOARD -> DashboardScreen(
                 viewModel = viewModel,
                 modifier = Modifier.padding(innerPadding)
